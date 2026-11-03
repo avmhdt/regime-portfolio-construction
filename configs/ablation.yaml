@@ -1,0 +1,11 @@
+# Ablation grid (FR-28, docs/preregistration.md): every cell is one backtest and one trial-log row.
+# Cells: optimizer x regime arm, plus the 1/N benchmark through the same pipeline.
+base: configs/base.yaml
+optimizers: [min_variance, erc, hrp, mv_turnover]
+regimes:
+  - {name: none, usage: none}
+  - {name: hmm_A, usage: hmm, feature_set: A}
+  - {name: hmm_B, usage: hmm, feature_set: B}
+  - {name: bocpd, usage: bocpd}
+benchmark: equal_weight
+headline: {optimizer: erc, regime: hmm_A}

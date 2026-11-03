@@ -116,3 +116,40 @@ Run lengths beyond 1,500 are dropped and the posterior renormalized. The outputs
 ## Leakage demonstration (AC-H-09, DQ-08)
 
 The comparison figure needs smoothed probabilities `P(S_t | x_1:T)`. They are computed by a forward–backward pass only in `regport.report.figures.smoothed_for_illustration`, with the final refit's parameters. They never feed a strategy.
+
+## Sharpe-ratio difference test (FR-27, D-08)
+
+The test follows Ledoit and Wolf (2008), on daily excess returns net of costs.
+
+- **Statistic:** with `u = (μ1, μ2, γ1, γ2)`, the means and second moments, `Δ = f(u) = μ1/√(γ1 − μ1²) − μ2/√(γ2 − μ2²)`.
+- **Delta method:** `se(Δ) = √(∇f′ Ψ ∇f / T)`, where `Ψ` is the long-run covariance of `y_t = (r1 − μ1, r2 − μ2, r1² − γ1, r2² − γ2)`.
+- **HAC version:** `Ψ` from a Parzen kernel with VAR(1) prewhitening and Andrews' bandwidth `2.6614 (α(2) T)^{1/5}`, recoloured by `(I − A)⁻¹`. It is scaled by `T/(T − 4)` and tested against the normal distribution.
+- **Bootstrap (headline):** a studentized circular block bootstrap with 5,000 resamples.
+  - The original statistic is studentized with the Parzen HAC standard error.
+  - Each resample uses the block covariance `Ψ* = (1/(lK)) Σ_j ζ_j ζ_j′` of its `K` block sums.
+  - `p = (#{|Δ* − Δ̂|/se* ≥ |Δ̂|/se} + 1)/(B + 1)`.
+  - The block size comes from Algorithm 3.1 over {1, 2, 4, 6, 8, 10}: VAR(1) pseudo-series with equal Sharpe ratios are simulated, and the block whose rejection rate at 5% is closest to 5% wins.
+- **Why not Jobson–Korkie:** it assumes iid normal returns. Ledoit–Wolf stays valid under fat tails and serial dependence. With iid normal data, the HAC standard error reproduces the Jobson–Korkie/Memmel closed form, `Var(Δ) = (2 − 2ρ + ½(SR1² + SR2² − 2 SR1 SR2 ρ²))/T`, within 2% (validation item 8).
+- **Holm (1979):** the adjusted p-values, in order, are `max_{j≤i} min(1, (m − j + 1) p_(j))`.
+
+## Deflated Sharpe ratio (AC-H-04)
+
+- **Expected maximum Sharpe under the null:** `SR0 = √V ((1 − γ) Φ⁻¹(1 − 1/N) + γ Φ⁻¹(1 − 1/(Ne)))`, where `V` is the variance of the per-period Sharpe ratios of the `N` trials in the log and `γ` is the Euler–Mascheroni constant.
+- **Deflated Sharpe ratio:** `DSR = Φ((SR − SR0) √(T − 1) / √(1 − γ3 SR + (γ4 − 1)/4 SR²))`.
+
+These are Bailey and López de Prado (2014), as in backtest-overfitting-lab's trial-log contract.
+
+## Stress statistics (FR-29)
+
+Inside each fixed window:
+
+- **Drawdown:** the lowest `wealth / HWM − 1`, with the high-water mark carried into the window, plus the peak and trough dates and the trading days between them.
+- **Recovery:** the trading days until wealth regains the peak level.
+- **Worst 5-day return:** the lowest compounded return over any five consecutive days.
+- **Realized volatility:** annualized.
+
+## Robustness and scaling (FR-30, FR-31)
+
+- **Cost grid:** uniform one-way costs of 0, 5, 10 and 25 bps. The break-even cost is linearly interpolated where a strategy's net Sharpe crosses 1/N's.
+- **Statistical factor covariance:** the top 10 principal components plus a diagonal residual, `Σ = Σ_{j≤10} λ_j v_j v_j′ + diag(S − Σ_{j≤10} λ_j v_j v_j′)`.
+- **Synthetic scaling data:** a 5-factor model, `r = f B′ + ε`.

@@ -288,5 +288,201 @@ def regime_report(config: ConfigOption = DEFAULT_CONFIG) -> None:
         typer.echo(f"{name:<22} {path}")
 
 
+GridOption = Annotated[
+    Path, typer.Option("--config", help="Grid config (YAML).", exists=True, dir_okay=False)
+]
+RunsOption = Annotated[
+    str | None, typer.Option("--runs", help="A grid manifest path (default: the latest grid).")
+]
+
+
+@app.command()
+def grid(config: GridOption = Path("configs/ablation.yaml")) -> None:
+    """Run every cell of the ablation grid (FR-28); each cell is one trial-log row."""
+    from regport.eval.grid import load_grid, run_grid
+
+    settings = get_settings()
+    configure_logging(settings.regport_log_level)
+    load_config(load_grid(config).base)
+    typer.echo(f"manifest {run_grid(config, settings)}")
+
+
+def _manifest(settings: Settings, runs: str | None) -> Path:
+    from regport.eval.grid import latest_manifest
+
+    return Path(runs) if runs else latest_manifest(settings.results_dir)
+
+
+@app.command()
+def evaluate(
+    config: ConfigOption = DEFAULT_CONFIG,
+    runs: RunsOption = None,
+    latest_grid: Annotated[bool, typer.Option("--latest-grid", help="Use the latest grid.")] = True,
+    benchmark: Annotated[str, typer.Option("--benchmark")] = "equal_weight",
+) -> None:
+    """Metrics, Ledoit-Wolf tests against 1/N, Holm, ablation, trials and the constraint audit."""
+    from regport.eval.evaluate import compare, constraint_audit, load_runs, trial_summary
+    from regport.report.evaluation import write_evaluation
+
+    cfg, settings, _ = _setup(config)
+    if benchmark != cfg.evaluation.benchmark:
+        raise typer.BadParameter("only the configured benchmark (equal_weight) is supported")
+    manifest = _manifest(settings, runs)
+    loaded, meta = load_runs(manifest)
+    table, ablation = compare(loaded, cfg, settings.regport_n_jobs)
+    log_path = Path(cfg.logging.experiment_log)
+    trials = trial_summary(log_path, table, loaded)
+    audit = constraint_audit(loaded, cfg.optimizer.max_weight, log_path)
+    head = meta.get("headline") or {"optimizer": cfg.optimizer.name, "regime": "hmm_A"}
+    headline = f"{head['optimizer']}+{head['regime']}"
+    dates = loaded[0].returns["date"]
+    for name, path in write_evaluation(
+        table,
+        ablation,
+        trials,
+        audit,
+        loaded,
+        headline,
+        (str(dates[0]), str(dates[-1])),
+        settings.reports_dir,
+    ).items():
+        typer.echo(f"{name:<13} {path}")
+
+
+@app.command()
+def stress(config: ConfigOption = DEFAULT_CONFIG, runs: RunsOption = None) -> None:
+    """Drawdown and recovery statistics in the fixed stress windows (FR-29)."""
+    import json
+
+    import polars as pl
+
+    from regport.eval.evaluate import load_runs
+    from regport.regime.runner import hmm_paths, load_features, run_bocpd, run_hmm
+    from regport.report.regimes import high_volatility_states, params_from_record
+    from regport.report.stress import write_stress
+
+    cfg, settings, _ = _setup(config)
+    loaded, meta = load_runs(_manifest(settings, runs))
+    feats = load_features(cfg, settings.data_dir / "processed")
+    out_dir = settings.results_dir / "regime"
+    probs, _, _ = run_hmm(cfg, feats, out_dir, settings.regport_n_jobs)
+    fits = json.loads(hmm_paths(cfg, feats, out_dir)[1].read_text(encoding="utf-8"))["fits"]
+    high = high_volatility_states(params_from_record(fits[str(max(int(k) for k in fits))]))
+    stress_prob = (
+        probs.filter(pl.col("state").is_in(high.tolist()))
+        .group_by("date", maintain_order=True)
+        .agg(pl.col("p_filtered").sum().alias("p_stress"))
+    )
+    cp = run_bocpd(cfg, feats, out_dir)
+    head = meta.get("headline") or {"optimizer": cfg.optimizer.name, "regime": "hmm_A"}
+    for name, path in write_stress(
+        loaded, cfg, f"{head['optimizer']}+{head['regime']}", stress_prob, cp, settings.reports_dir
+    ).items():
+        typer.echo(f"{name:<11} {path}")
+
+
+@app.command()
+def robustness(
+    config: ConfigOption = DEFAULT_CONFIG,
+    suite: Annotated[
+        str, typer.Option("--suite", help="costs | common_start | french | alfred | all.")
+    ] = "all",
+    report_only: Annotated[
+        bool,
+        typer.Option("--report-only", help="Rebuild the report from saved tables; no new runs."),
+    ] = False,
+) -> None:
+    """Robustness suites (FR-30); every run is logged as a trial."""
+    import polars as pl
+
+    from regport.backtest.engine import Panel
+    from regport.eval import robustness as rb
+    from regport.report.robustness import write_robustness
+
+    cfg, settings, _ = _setup(config)
+    all_suites = ["costs", "common_start", "french", "alfred"]
+    suites = all_suites if suite == "all" else [suite]
+    if any(s not in all_suites for s in suites):
+        raise typer.BadParameter(f"unknown suite {suite}")
+    saved = settings.reports_dir / "tables"
+    tables: dict[str, pl.DataFrame] = {}
+    for name in all_suites:  # keep earlier suites in the report when only some are re-run
+        path = saved / f"robustness_{name}.csv"
+        if path.exists() and (report_only or name not in suites):
+            tables[name] = pl.read_csv(path)
+    notes = {
+        "french": (
+            "Value-weighted daily industry returns from 1990-01-02, uniform one-way cost "
+            f"{rb.FRENCH_COST_BPS:g} bps, risk-free rate from the FF RF series. The regime "
+            "features use the FF market factor and BAA10Y from 1986, so the HMM's first fit "
+            "comes after 2,520 days; before it the hmm arm runs on the base estimator."
+        ),
+        "alfred": (
+            "The headline optimizer (ERC) with feature set B, macro features as revised today "
+            "instead of as published. Compare with `erc+hmm_B` in reports/oos_vs_1n.md (point "
+            "in time)."
+        ),
+    }
+    regime_diff = None
+    if not report_only:
+        panel = Panel.load(settings.data_dir / "processed")
+        for name in suites:
+            if name == "costs":
+                tables[name] = rb.summarize(rb.costs_suite(cfg, settings, panel))
+            elif name == "common_start":
+                tables[name] = rb.summarize(rb.common_start_suite(cfg, settings, panel))
+            elif name == "french":
+                tables[name] = rb.summarize(rb.french_suite(cfg, settings))
+            else:
+                runs, regime_diff = rb.alfred_suite(cfg, settings, panel)
+                tables[name] = rb.summarize(runs)
+    if regime_diff is None and "alfred" in tables:
+        regime_diff = rb.regime_difference(*rb.alfred_configs(cfg), settings)
+    break_even = rb.break_even(tables["costs"]) if "costs" in tables else None
+    ordered = {k: tables[k] for k in all_suites if k in tables}
+    for key, path in write_robustness(
+        ordered, break_even, regime_diff, notes, settings.reports_dir
+    ).items():
+        typer.echo(f"{key:<13} {path}")
+
+
+bench_app = typer.Typer(no_args_is_help=True, help="Benchmarks (FR-31).")
+app.add_typer(bench_app, name="bench")
+
+
+@bench_app.command("scaling")
+def bench_scaling(
+    config: ConfigOption = DEFAULT_CONFIG,
+    n: Annotated[str, typer.Option("--n", help="Universe sizes.")] = "12,49,100,250,500",
+    repeats: Annotated[int, typer.Option("--repeats")] = 5,
+) -> None:
+    """Runtime, memory and conditioning from 12 to 500 assets (AC-H-05)."""
+    import numpy as np
+    import polars as pl
+
+    from regport.eval.robustness import french_panel
+    from regport.eval.scaling import WINDOW, scaling_table
+    from regport.report.scaling import write_scaling
+
+    cfg, settings, _ = _setup(config)
+    extra = {}
+    processed = settings.data_dir / "processed"
+    if (processed / "french_daily.parquet").exists():
+        panel = french_panel(processed, "ind49_daily")
+        block = panel.returns[-WINDOW:]
+        extra["49 industries"] = block[:, ~np.isnan(block).any(axis=0)]
+    table, cond = scaling_table([int(v) for v in n.split(",")], repeats, cfg.seed, extra)
+    hrp_vs_mv = None
+    rob = settings.reports_dir / "tables" / "robustness_french.csv"
+    if rob.exists():
+        r = pl.read_csv(rob).filter(
+            (pl.col("variant") == "ind49_daily")
+            & pl.col("optimizer").is_in(["hrp", "min_variance"])
+        )
+        hrp_vs_mv = r.select("optimizer", "regime", "annual_volatility", "sharpe", "max_drawdown")
+    for key, path in write_scaling(table, cond, hrp_vs_mv, settings.reports_dir).items():
+        typer.echo(f"{key:<9} {path}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

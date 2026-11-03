@@ -1,0 +1,67 @@
+universe,n_assets,stage,method,median_seconds,peak_mib
+12,12,estimator,sample,0.0000703,0.0938949585
+12,12,estimator,ewma,0.0000509,0.0974578857
+12,12,estimator,ledoit_wolf,0.0004288,0.097328186
+12,12,estimator,oas,0.0002732,0.0954170227
+12,12,estimator,factor_pca10,0.0000881,0.0938949585
+12,12,optimizer,min_variance (Ledoit-Wolf),0.0009458,0.0144004822
+12,12,optimizer,min_variance (factor),0.0007837,0.0142345428
+12,12,optimizer,erc (Ledoit-Wolf),0.0001301,0.0096435547
+12,12,optimizer,hrp (Ledoit-Wolf),0.0003247,0.0094070435
+12,12,optimizer,mv_turnover (Ledoit-Wolf),0.0056977,0.1312561035
+12,12,optimizer,mv_turnover (factor),0.0035852,0.1300926208
+49,49,estimator,sample,0.0002371,0.2527389526
+49,49,estimator,ewma,0.0002425,0.2560195923
+49,49,estimator,ledoit_wolf,0.0008717,0.4168167114
+49,49,estimator,oas,0.0006403,0.2541999817
+49,49,estimator,factor_pca10,0.0004963,0.2527389526
+49,49,optimizer,min_variance (Ledoit-Wolf),0.0027397,0.1161441803
+49,49,optimizer,min_variance (factor),0.0024441,0.1161441803
+49,49,optimizer,erc (Ledoit-Wolf),0.0002,0.0755462646
+49,49,optimizer,hrp (Ledoit-Wolf),0.0008944,0.0757369995
+49,49,optimizer,mv_turnover (Ledoit-Wolf),0.0064032,0.4197473526
+49,49,optimizer,mv_turnover (factor),0.0071417,0.4195747375
+100,100,estimator,sample,0.0006656,0.4691028595
+100,100,estimator,ewma,0.0006787,0.4729938507
+100,100,estimator,ledoit_wolf,0.0021727,0.9256534576
+100,100,estimator,oas,0.0018251,0.54600811
+100,100,estimator,factor_pca10,0.001151,0.7011432648
+100,100,optimizer,min_variance (Ledoit-Wolf),0.0138732,0.4690570831
+100,100,optimizer,min_variance (factor),0.0122571,0.4690570831
+100,100,optimizer,erc (Ledoit-Wolf),0.0010198,0.3090057373
+100,100,optimizer,hrp (Ledoit-Wolf),0.0018586,0.3074645996
+100,100,optimizer,mv_turnover (Ledoit-Wolf),0.0199013,1.3608427048
+100,100,optimizer,mv_turnover (factor),0.0220438,1.3612232208
+250,250,estimator,sample,0.0042131,2.8872394562
+250,250,estimator,ewma,0.0041058,2.8911304474
+250,250,estimator,ledoit_wolf,0.0190441,2.8881082535
+250,250,estimator,oas,0.0176392,2.887881279
+250,250,estimator,factor_pca10,0.0088002,4.3243427277
+250,250,optimizer,min_variance (Ledoit-Wolf),0.077337,2.8871936798
+250,250,optimizer,min_variance (factor),0.083513,2.8871936798
+250,250,optimizer,erc (Ledoit-Wolf),0.3978702,1.9157867432
+250,250,optimizer,hrp (Ledoit-Wolf),0.004769,1.9119262695
+250,250,optimizer,mv_turnover (Ledoit-Wolf),0.1059023,7.6406040192
+250,250,optimizer,mv_turnover (factor),0.0878806,7.6400165558
+500,500,estimator,sample,0.0262124,11.4951038361
+500,500,estimator,ewma,0.0242635,11.4989948273
+500,500,estimator,ledoit_wolf,0.1183049,11.4959287643
+500,500,estimator,oas,0.108075,11.4957895279
+500,500,estimator,factor_pca10,0.050115,17.2294635773
+500,500,optimizer,min_variance (Ledoit-Wolf),0.429039,11.4950885773
+500,500,optimizer,min_variance (factor),0.3780705,11.4950885773
+500,500,optimizer,erc (Ledoit-Wolf),0.0220977,7.6454620361
+500,500,optimizer,hrp (Ledoit-Wolf),0.0173213,7.6378173828
+500,500,optimizer,mv_turnover (Ledoit-Wolf),0.4158913,29.7408761978
+500,500,optimizer,mv_turnover (factor),0.5276027,29.741484642
+49 industries,49,estimator,sample,0.0002228,0.2518310547
+49 industries,49,estimator,ewma,0.0002051,0.2551116943
+49 industries,49,estimator,ledoit_wolf,0.00106,0.4167041779
+49 industries,49,estimator,oas,0.0010735,0.2532157898
+49 industries,49,estimator,factor_pca10,0.0007459,0.2518310547
+49 industries,49,optimizer,min_variance (Ledoit-Wolf),0.0032391,0.1161441803
+49 industries,49,optimizer,min_variance (factor),0.0032937,0.1161441803
+49 industries,49,optimizer,erc (Ledoit-Wolf),0.0002384,0.0755462646
+49 industries,49,optimizer,hrp (Ledoit-Wolf),0.000928,0.0757369995
+49 industries,49,optimizer,mv_turnover (Ledoit-Wolf),0.010239,0.4196329117
+49 industries,49,optimizer,mv_turnover (factor),0.0085048,0.4201288223
