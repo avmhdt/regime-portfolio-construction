@@ -23,6 +23,34 @@ class SolverError(RuntimeError):
     """Every configured solver failed; the caller decides the fallback (FR-17)."""
 
 
+# Tight tolerances: NFR-03 only allows clipping weights within 1e-9 of their bounds.
+SOLVER_OPTIONS: dict[str, dict[str, float | int | bool]] = {
+    "CLARABEL": {"tol_gap_abs": 1e-10, "tol_gap_rel": 1e-10, "tol_feas": 1e-10, "max_iter": 500},
+    "OSQP": {"eps_abs": 1e-10, "eps_rel": 1e-10, "max_iter": 200_000, "polish": True},
+}
+
+
+def solve_weights(
+    problem: cp.Problem, w: cp.Variable, cap: float, solvers: tuple[str, ...], what: str
+) -> F64:
+    """Solve with each solver in turn; clean and return the first acceptable weights."""
+    errors = []
+    for solver in solvers:
+        try:
+            problem.solve(solver=solver, **SOLVER_OPTIONS.get(solver, {}))
+        except cp.error.SolverError as exc:
+            errors.append(f"{solver}: {exc}")
+            continue
+        if problem.status in ("optimal", "optimal_inaccurate") and w.value is not None:
+            try:
+                return clean_weights(np.asarray(w.value, dtype=np.float64), cap)
+            except ConstraintViolation as exc:
+                errors.append(f"{solver}: {exc}")
+                continue
+        errors.append(f"{solver}: status {problem.status}")
+    raise SolverError(f"{what} failed ({'; '.join(errors)})")
+
+
 @lru_cache(maxsize=64)
 def _problem(n: int) -> tuple[cp.Problem, cp.Variable, cp.Parameter, cp.Parameter]:
     w = cp.Variable(n)
@@ -52,18 +80,4 @@ def min_variance(
     scale = float(np.mean(np.diag(cov)))
     factor.value = _factor(cov / scale)
     cap.value = effective_cap(max_weight, n)
-    last = ""
-    for solver in solvers:
-        try:
-            problem.solve(solver=solver)
-        except cp.error.SolverError as exc:
-            last = f"{solver}: {exc}"
-            continue
-        if problem.status in ("optimal", "optimal_inaccurate") and w.value is not None:
-            try:
-                return clean_weights(np.asarray(w.value, dtype=np.float64), cap.value)
-            except ConstraintViolation as exc:
-                last = f"{solver}: {exc}"
-                continue
-        last = f"{solver}: status {problem.status}"
-    raise SolverError(f"min_variance failed ({last})")
+    return solve_weights(problem, w, float(cap.value), solvers, "min_variance")

@@ -158,7 +158,7 @@ def sharpe_annual(ret: npt.ArrayLike, periods_per_year: int = PERIODS_PER_YEAR) 
     if arr.size < 2:
         raise TrialLogError("need at least two returns for a Sharpe ratio")
     std = float(np.std(arr, ddof=1))
-    if std == 0.0:
+    if std == 0.0 or np.ptp(arr) == 0.0:  # a constant series: rounding can leave std ~ 1e-20
         return 0.0
     return float(np.mean(arr)) / std * math.sqrt(periods_per_year)
 

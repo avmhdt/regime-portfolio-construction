@@ -131,3 +131,20 @@ Answered in the main session and relayed by the 15-projects review session.
 - **Min-variance in the evaluation:** FR-17's long-only problem with the 0.40 cap. The cap is raised to 1/N when fewer than three assets make 0.40 infeasible.
 - **EWMA:** RiskMetrics zero-mean recursion with λ = 0.5^(1/63) over the 504-day window, weights normalized to sum to 1, which is the bias correction. Sample, Ledoit–Wolf and OAS demean.
 - **Reproducibility (NFR-02):** repeated runs give min-variance weights that differ at about 1e-15 (cvxpy with CLARABEL), so cov-eval tables are equal after rounding to 1e-10, which is NFR-02's rule, rather than bit for bit. `reports/tables/*.csv` are written rounded to 10 decimals.
+
+## M4 choices (2026-11-03)
+
+| Topic | Choice | Why |
+|---|---|---|
+| Investable set in backtests | An ETF enters every strategy, 1/N included, at the first decision date with 252 valid returns (D-02). The covariance window then shrinks to the assets' common history. DQ-04's 5% rule counts only gaps after an asset's first return | D-02 says the same set applies to every strategy. M3's cov-eval keeps the rule fixed before it ran, which counts pre-inception days as missing |
+| Constraints with the threshold rule | `check_constraints` runs on every optimizer target, and post-trade weights satisfy the constraints whenever a trade executes. Without a trade, D-06 keeps drifted weights within 2 points of target, which can sit just above the 0.40 cap (0.414 on the synthetic fixture). The audit reports such drift | D-06 is the owner's rule. Trading whenever drift breaks the cap would change it |
+| Solver fallback | Previous drifted weights, projected onto the constraints (capped, excess spread pro rata), with a logged `solver_fallback` event. A run fails if fallbacks exceed 1% of rebalances (NFR-09) | Drifted weights alone can break the cap |
+| Solver tolerances | CLARABEL `tol_gap_abs`, `tol_gap_rel` and `tol_feas` at 1e-10; OSQP `eps_abs` and `eps_rel` at 1e-10 with polishing | NFR-03 allows clipping only within 1e-9; default tolerances left weights at -5e-7 |
+| Turnover penalty scale | `κ_i = c_i · turnover_penalty_mult · 12` for monthly decisions (52 weekly) | μ and Σ are annual; a one-off cost amortized over one rebalance interval is that much per year |
+| Mean estimator | James–Stein toward the cross-sectional grand mean, `φ = min(1, (N−3)/(T (μ̂−μ0)'Σ⁻¹(μ̂−μ0)))`, from the last 252 daily returns | FR-20's default; no shrinkage when N ≤ 3 |
+| Start of each run | The first decision is on the last trading date before 2005-01-03. The portfolio starts in cash, so the first return day (2005-01-03) carries only the set-up cost, the same for 1/N and every strategy | DQ-06 timing from a cold start |
+| Turnover metric | `turnover = Σ|trade|` per execution day, as the spec defines it, so it counts both legs; annual turnover is its sum per year | §7b schema |
+| No real-data backtests in M4 | The engine is tested on synthetic panels only. Any real run is a trial in the log, so none happens before `docs/preregistration.md` is committed (AC-H-10) | Keeps the trial count honest |
+| riskfolio-lib | Not installed locally (a large dependency tree, and `uv` can't cap download speed under the 10 MB/s rule). The xcheck job runs those tests in CI | Owner's bandwidth rule |
+| ERC cross-check (AC-W-08) | Against riskfolio-lib, ERC matches within 1e-6 on 11 of the 23 matrices and differs by at most 1.7e-6 on the other 12. In every one of those 12, riskfolio's own weights miss equal risk contributions by more than 100 times ours, which stop at max \|RC − 1/N\| ≤ 1e-10. The test checks that explanation case by case and caps any difference at 1e-5. This is the spec's "documented, explained difference" | `rp_optimization` solves a convex program at its solver's default tolerance, so its weights carry about 1e-6 of solver error. HRP matches within 1e-6 on all 23 |
+| Golden tolerance | Golden values are stored rounded to 1e-10 and compared within 1e-9, or 1e-8 for solver-based optimizers | CI on Ubuntu found an ERC weight one unit apart in the tenth decimal, a rounding-boundary effect |

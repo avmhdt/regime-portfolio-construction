@@ -1,1 +1,1 @@
-"""exec package."""
+"""Execution: transaction costs and rebalancing."""

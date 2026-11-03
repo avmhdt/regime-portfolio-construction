@@ -132,11 +132,15 @@ def trailing_window(
     asof: date,
     window: int,
     max_null_share: float = 0.05,
+    count_pre_inception: bool = True,
 ) -> ReturnWindow:
     """Returns of assets eligible at ``asof`` over the ``window`` rows ending at ``asof``.
 
     DQ-04: an asset with more than ``max_null_share`` null returns in the window is excluded;
-    rows with a null among the remaining assets are dropped. DQ-01: raises ``LookaheadError`` if
+    rows with a null among the remaining assets are dropped. With ``count_pre_inception`` (the
+    M3 cov-eval protocol) days before an asset's first return count as null; without it (the
+    backtest engine, D-02) only gaps after its first return count, so a newly eligible asset stays
+    in and the window shrinks to the assets' common history. DQ-01: raises ``LookaheadError`` if
     ``asof`` is not a row date (the caller would otherwise be guessing which rows are known).
     """
     try:
@@ -147,7 +151,13 @@ def trailing_window(
     block = returns[start : end + 1]
     if any(d > asof for d in dates[start : end + 1]):  # pragma: no cover - guarded by index
         raise LookaheadError("window contains rows after asof")
-    null_share = np.isnan(block).mean(axis=0)
+    missing = np.isnan(block)
+    if count_pre_inception:
+        null_share = missing.mean(axis=0)
+    else:
+        started = np.maximum.accumulate(~missing, axis=0)
+        span = np.maximum(started.sum(axis=0), 1)
+        null_share = (missing & started).sum(axis=0) / span
     keep = eligible[end] & (null_share <= max_null_share)
     excluded = [s for s, e, k in zip(symbols, eligible[end], keep, strict=True) if e and not k]
     cols = np.flatnonzero(keep)
