@@ -55,4 +55,14 @@ Does a regime layer built from strictly filtered probabilities improve out-of-sa
 
 ## Deviations
 
-None yet.
+### 2026-11-03: BOCPD hazard reselected under the validation constraint (owner ruling)
+
+- **The original result, kept on record.** The rule fixed beforehand picked hazard 1/100 with α0 = 2, the highest pre-2005 predictive log-likelihood. At that setting, validation item (3b) failed: about 6.8 false alarms per 1,000 stationary synthetic days, against at most 1. Detection (3a) passed.
+- **The owner's ruling.** Reselect on pre-2005 and synthetic data only, restricted to settings that pass both checks. The rule below was fixed and committed before the reselection ran.
+  - **Grid:** unchanged, hazard λ ∈ {100, 250, 500, 1000} × α0 ∈ {2, 5, 10, 20}, with `β0 = (α0 − 1) s²`, where `s` is the standard deviation of the pre-2005 SPY (proxy) log return.
+  - **Synthetic checks:** run with base volatility σ = s, at 20 fixed-seed replications per setting.
+  - **(3a) detection:** six segments of 400 days that alternate σ and 3σ, so five shifts. A replication passes if at least 4 of the 5 shifts are flagged (`P(r < 21) > 0.5`) within 10 observations. The setting passes if at least 18 of 20 replications pass.
+  - **(3b) false alarms:** 10,000 stationary days at σ. Count onsets (crossings above 0.5) after a 100-day burn-in. The setting passes if the mean over the 20 replications is at most 1.0 per 1,000 days.
+  - **Choice:** among the settings that pass both, the highest pre-2005 predictive log-likelihood. If none passes, nothing changes and the owner is told.
+  - **Also reported:** detection under the literal "variance ×3" reading (σ and √3σ).
+- **Result:** recorded below once the reselection has run.
