@@ -191,5 +191,41 @@ def cov_eval(
         typer.echo(f"{name:<7} {out}")
 
 
+@app.command()
+def backtest(
+    config: ConfigOption = DEFAULT_CONFIG,
+    optimizer: Annotated[
+        str | None,
+        typer.Option("--optimizer", help="min_variance | erc | hrp | mv_turnover | equal_weight."),
+    ] = None,
+    regime: Annotated[
+        str | None, typer.Option("--regime", help="none | hmm | bocpd | hmm_bocpd.")
+    ] = None,
+    cost_bps: Annotated[
+        float | None, typer.Option("--cost-bps", help="Uniform one-way cost override (bps).")
+    ] = None,
+    tag: Annotated[str, typer.Option("--tag", help="Free-text label stored with the run.")] = "",
+) -> None:
+    """One backtest; appends one row to the trial log and prints the run_id."""
+    from regport.backtest.engine import BacktestError, run_backtest
+    from regport.errors import ConstraintViolation
+
+    cfg, settings, _ = _setup(config)
+    data = cfg.model_dump()
+    if optimizer is not None:
+        data["optimizer"]["name"] = optimizer
+    if regime is not None:
+        data["regime"]["usage"] = regime
+    if cost_bps is not None:
+        data["costs"]["override_bps"] = cost_bps
+    cfg = type(cfg).model_validate(data)
+    try:
+        result = run_backtest(cfg, settings, tag=tag)
+    except (BacktestError, ConstraintViolation) as exc:
+        typer.echo(f"error: {exc} (logged as a failed run)", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(result.run_id)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

@@ -34,3 +34,52 @@ The selection rule was fixed in `docs/decisions.md` before the first evaluation.
 ## Minimum variance (FR-17)
 
 `min w'Σw` subject to `1'w = 1` and `0 ≤ w ≤ c`, where `c = max(0.40, 1/N)`. The problem is solved as `||L'w||²` with `Σ = LL'`, first with CLARABEL and then with OSQP if CLARABEL fails. Weights within `1e-9` of the bounds are clipped and renormalized; anything larger raises `ConstraintViolation`. Validation: when no bound binds, the solution equals the closed form `Σ⁻¹1 / (1'Σ⁻¹1)` within 1e-6.
+
+## Equal risk contribution (FR-18)
+
+ERC uses Spinu's (2013) convex problem: `min_y ½ y'Σy − Σ_i b_i ln y_i` over `y > 0`. Its first-order condition is `y_i (Σy)_i = b_i`, so `w = y / 1'y` has relative risk contributions `RC_i = w_i (Σw)_i / (w'Σw) = b_i`, with `b_i = 1/N` by default (Maillard, Roncalli and Teïletche 2010).
+
+- **Solver:** Newton's method with gradient `Σy − b/y`, Hessian `Σ + diag(b/y²)` and Armijo backtracking that keeps `y > 0`.
+- **Fallback:** cyclical coordinate descent, where each step is the positive root of `Σ_ii y_i² + (Σ_{j≠i} Σ_ij y_j) y_i − b_i = 0`.
+- **Stopping:** at `max_i |RC_i − b_i| ≤ 1e-10`. A result above 1e-6 raises.
+
+## Hierarchical risk parity (FR-19)
+
+HRP follows López de Prado (2016):
+
+1. **Distance:** `d_ij = sqrt((1 − ρ_ij)/2)`, clustered by single linkage on the condensed matrix.
+2. **Ordering:** the dendrogram's leaf order (no optimal reordering).
+3. **Bisection:** recursive halving of the ordered list. Each half's variance is that of its inverse-variance portfolio, `v = w_ivp' Σ_half w_ivp`. The left half's weight is scaled by `α = 1 − v_L/(v_L + v_R)` and the right half's by `1 − α`.
+
+## Mean-variance with a turnover penalty (FR-20)
+
+The problem is `max_w μ'w − (γ/2) w'Σw − Σ_i κ_i |w_i − w_prev,i|` subject to `1'w = 1` and `0 ≤ w ≤ 0.40`, with `γ = 5`.
+
+- **Penalty:** `κ_i = c_i · m · 12`, where `c_i` is the one-way cost, `m` the multiplier and 12 the rebalances per year, putting a one-off cost on the same annual scale as `μ`.
+- **Mean:** `μ` is the James–Stein estimate `μ0 + (1 − φ)(μ̂ − μ0)`. Here `μ̂` is the mean of the last 252 daily returns, `μ0` its cross-sectional average, and `φ = min(1, (N−3)/(T (μ̂−μ0)'Σ⁻¹(μ̂−μ0)))`.
+
+## Costs, rebalancing and timing (FR-21 to FR-24, DQ-06)
+
+- **Decision dates:** the last trading date of each month.
+- **Threshold rule:** trade to target only if `max_i |w_drift,i − w_target,i| > 0.02`.
+- **Timing:** weights decided at the close of `t` execute at the close of `t+1`. Day `t+1`'s return accrues to the drifted old weights, and the cost `Σ_i c_i |trade_i|` is charged that day. New weights earn from `t+2`.
+- **Drift:** between trades, `w_{t+1} = w_t ⊙ (1 + r_{t+1}) / (1 + w_t'r_{t+1})`.
+- **1/N:** goes through the same eligibility, schedule, threshold, lag and cost model. Its target is `1/N_t` over the assets eligible at `t`.
+
+## Metrics (FR-26)
+
+On daily net returns `r` and excess returns `e = r − rf`:
+
+| Metric | Formula |
+|---|---|
+| Annual return | `(Π(1+r))^(252/T) − 1` |
+| Volatility | `std(r)·√252` |
+| Sharpe | `mean(e)/std(e)·√252` |
+| Sortino | `mean(e)/sqrt(mean(min(e,0)²))·√252` |
+| Max drawdown | Minimum of `wealth/peak − 1` |
+| Calmar | Annual return / abs(max drawdown) |
+| CEQ | `252·(mean(e) − (γ/2)·var(e))` with `γ = 1` |
+| Turnover, cost drag | `Σ|trade|` and `Σ cost` per year |
+| Effective number of assets | Mean of `1/Σw²` |
+
+The trial log's `sharpe_annual` is the contract's raw-return Sharpe `mean(r)/std(r)·√252`.

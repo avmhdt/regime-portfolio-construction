@@ -41,3 +41,24 @@ def clean_weights(w: F64, max_weight: float | None = None) -> F64:
     out = out / out.sum()
     check_constraints(out, max_weight)
     return out
+
+
+def project_capped(w: F64, max_weight: float | None) -> F64:
+    """Nearest-in-spirit feasible weights: clip at the cap and hand the excess to the uncapped
+    assets in proportion to their weights (repeated until nothing exceeds the cap).
+
+    Used for the previous-weights fallback (FR-17), whose drifted weights may exceed the cap.
+    """
+    out = np.clip(np.asarray(w, dtype=np.float64), 0.0, None)
+    out = out / out.sum() if out.sum() > 0 else np.full(out.size, 1.0 / out.size)
+    cap = effective_cap(max_weight, out.size)
+    for _ in range(out.size):
+        over = out > cap
+        if not over.any():
+            break
+        excess = float((out[over] - cap).sum())
+        out[over] = cap
+        free = ~over & (out < cap)
+        base = out[free].sum()
+        out[free] += excess * (out[free] / base if base > 0 else 1.0 / free.sum())
+    return out

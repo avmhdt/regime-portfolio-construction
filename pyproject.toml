@@ -68,6 +68,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "NPY", "PD", "RUF"]
+# Formulas in docstrings use the mathematical minus sign, en dashes in paper names and Greek letters.
+allowed-confusables = ["−", "–", "γ", "ρ", "σ", "ν", "κ", "λ", "μ", "φ", "α", "δ"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["typer.Option", "typer.Argument"]

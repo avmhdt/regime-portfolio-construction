@@ -51,7 +51,7 @@ def test_solver_failure_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     class Broken:
         status = "infeasible"
 
-        def solve(self, solver: str) -> None:
+        def solve(self, solver: str, **_: object) -> None:
             if solver == "OSQP":
                 raise minvar.cp.error.SolverError("boom")
 
