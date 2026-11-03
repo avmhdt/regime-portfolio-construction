@@ -221,10 +221,71 @@ def backtest(
     cfg = type(cfg).model_validate(data)
     try:
         result = run_backtest(cfg, settings, tag=tag)
-    except (BacktestError, ConstraintViolation) as exc:
+    except (BacktestError, ConstraintViolation, ValueError, OSError) as exc:
         typer.echo(f"error: {exc} (logged as a failed run)", err=True)
         raise typer.Exit(code=1) from None
     typer.echo(result.run_id)
+
+
+regime_app = typer.Typer(no_args_is_help=True, help="Walk-forward regime models (FR-11 to FR-16).")
+app.add_typer(regime_app, name="regime")
+
+
+@regime_app.command("run")
+def regime_run(
+    config: ConfigOption = DEFAULT_CONFIG,
+    model: Annotated[str, typer.Option("--model", help="hmm | bocpd | all.")] = "all",
+    features: Annotated[
+        str | None, typer.Option("--features", help="A | B (default: the config's set).")
+    ] = None,
+    force: ForceOption = False,
+) -> None:
+    """Filtered regime probabilities to results/regime/ (cached by settings and data)."""
+    from regport.regime.runner import load_features, run_bocpd, run_hmm
+
+    cfg, settings, _ = _setup(config)
+    if features is not None:
+        data = cfg.model_dump()
+        data["regime"]["hmm"]["feature_set"] = features
+        cfg = type(cfg).model_validate(data)
+    processed = settings.data_dir / "processed"
+    feats = load_features(cfg, processed)
+    out_dir = settings.results_dir / "regime"
+    proxy = int((feats["spy_source"] != "sharadar").sum())
+    typer.echo(
+        f"features {cfg.regime.hmm.feature_set}: {feats.height} days from "
+        f"{feats['date'][0]}, {proxy} on the French market proxy for SPY"
+    )
+    if model in ("hmm", "all"):
+        probs, transmats, switches = run_hmm(cfg, feats, out_dir, settings.regport_n_jobs, force)
+        typer.echo(
+            f"hmm: {len(transmats)} refits, {len(switches)} label switches, "
+            f"{probs['date'].n_unique()} dates"
+        )
+    if model in ("bocpd", "all"):
+        frame = run_bocpd(cfg, feats, out_dir, force)
+        typer.echo(
+            f"bocpd: {frame.height} dates, "
+            f"{int((frame['cp_prob_short'] > cfg.regime.bocpd.trigger_prob).sum())} "
+            "above the trigger"
+        )
+
+
+@regime_app.command("report")
+def regime_report(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """reports/regimes.md and figures from the cached walk-forward outputs (FR-34, AC-H-09)."""
+    from regport.regime.runner import hmm_paths, load_features, run_hmm
+    from regport.report.regimes import write_regimes_report
+
+    cfg, settings, _ = _setup(config)
+    feats = load_features(cfg, settings.data_dir / "processed")
+    out_dir = settings.results_dir / "regime"
+    probs, _, _ = run_hmm(cfg, feats, out_dir, settings.regport_n_jobs)
+    _, fits_path = hmm_paths(cfg, feats, out_dir)
+    for name, path in write_regimes_report(
+        cfg, feats, probs, fits_path, settings.reports_dir
+    ).items():
+        typer.echo(f"{name:<22} {path}")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -165,3 +165,18 @@ Answered in the main session and relayed by the 15-projects review session.
   - **Ambiguity:** "5 variance shifts (×3)" can mean the variance or the standard deviation multiplied by 3. Both are run and both are reported. A variance tripling carries about 0.45 nats of evidence per observation against a prior change-point log-odds of about −5.5 at λ = 250, so detecting it within 10 observations is close to impossible. The standard-deviation reading (variance ×9) is the one tested against the threshold.
   - **False alarms:** the onsets per 1,000 stationary observations, i.e. days where `cp_prob_short` crosses above 0.5, after a 100-day burn-in.
 - **Status:** the reading of "×3" is the agent's choice, recorded here. It goes to the owner if the result depends on it.
+
+## M5 results and choices (2026-11-03)
+
+| Topic | Choice or result | Why |
+|---|---|---|
+| K (D-05) | 4. BIC 15,657 against 15,684 for K = 3 and 15,893 for K = 2, on 3,003 days from 1993-02-02 to 2004-12-31 | Rule fixed beforehand |
+| BOCPD (FR-14) | Hazard 1/100, α0 = 2, β0 = 1.189e-4. Highest pre-2005 predictive log-likelihood (9,781.0, against 9,776.3 at 1/250) | Rule fixed beforehand |
+| BOCPD validation (3b) | **Fails at the chosen hazard:** about 6.8 false alarms per 1,000 stationary days, against ≤ 1. A grid over hazard × α0 (8 replications each) shows the same code at 0.4–0.8 per 1,000 at hazard 1/500, with ≥ 4 of 5 shifts detected in 88–100% of replications. Detection (3a) passes at the chosen hazard. The test is an expected failure pending the owner's ruling | Not retuned to pass: the hazard was chosen by the preregistered rule |
+| Fixed during M5 | An integer prior (`mu0 = 0`) made Numba compile integer arrays for the running means, which broke BOCPD. Every argument is now cast to float. A test checks the result against a textbook implementation to 1e-12 | — |
+| Label-switch count (FR-13) | A switch is a change, between consecutive refits, of the alignment permutation applied on top of the canonical order. The first real run counted every refit whose aligned labels differed from canonical order (231 of 285), which double-counts after the first real switch | A persistent relabelling is one event, not one per refit |
+| HMM fitting speed | hmmlearn `implementation="scaling"` (about 2× faster than `"log"`), refits in parallel over `REGPORT_N_JOBS` processes (8 for the real run, with BLAS threads at 1). The full walk-forward (285 refits × 10 restarts) took 533 s on the reference PC (NFR-01: ≤ 30 min). Seeds are per refit, so results don't depend on the job count | Owner's 8-thread limit |
+| Forward filter | Own log-space recursion compiled with Numba. It matches hmmlearn's `score` to 7.5e-14 relative and its last smoothed row to 2.4e-13 | FR-12 |
+| Missing macro releases | In feature set B a missing month (e.g. October 2025, during the US government shutdown) carries the last known value forward | Uses no later data |
+| BAA10Y in reports | `reports/regimes.md` tabulates state emissions for the equity-return feature only | P-07 ruling: BAA10Y is a model input, never tabulated |
+| Smoothed probabilities | Own forward–backward pass in `regport.report.figures.smoothed_for_illustration`, with the final refit's parameters. Equals hmmlearn's `predict_proba` to 1e-10 in a test | DQ-08 |

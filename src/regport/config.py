@@ -73,6 +73,8 @@ class HMMConfig(_Strict):
     max_iter: int = Field(default=500, ge=1)
     tol: float = Field(default=1.0e-6, gt=0)
     state_cov_shrinkage: float = Field(default=0.5, ge=0, le=1)
+    # ALFRED values as published (headline) or as revised today (AC-H-07 contrast only).
+    macro_vintage: Literal["pit", "latest"] = "pit"
 
 
 class NormalGammaPriorConfig(_Strict):

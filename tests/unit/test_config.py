@@ -16,11 +16,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_base_config_matches_spec_defaults() -> None:
     cfg = load_config(ROOT / "configs/base.yaml")
-    # risk.estimator is the D-12 choice from M3; every other value is the spec default.
+    # Selections fixed on pre-OOS data: risk.estimator (D-12, M3), regime.hmm.n_states (D-05)
+    # and the BOCPD hazard and prior (FR-14). Every other value is the spec default.
     assert cfg.risk.estimator == "ewma"
-    assert cfg.model_copy(
-        update={"risk": cfg.risk.model_copy(update={"estimator": "ledoit_wolf"})}
-    ) == (ExperimentConfig())
+    assert cfg.regime.hmm.n_states == 4
+    assert cfg.regime.bocpd.hazard_lambda_days == 100
+    data = cfg.model_dump()
+    data["risk"]["estimator"] = "ledoit_wolf"
+    data["regime"]["hmm"]["n_states"] = "auto"
+    data["regime"]["bocpd"]["hazard_lambda_days"] = 250
+    data["regime"]["bocpd"]["prior"]["beta0"] = 1.0e-4
+    assert ExperimentConfig.model_validate(data) == ExperimentConfig()
     assert cfg.sample.oos_start == date(2005, 1, 3)
     assert cfg.optimizer.max_weight == 0.40
     assert cfg.execution.threshold_abs == 0.02
