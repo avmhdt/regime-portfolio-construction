@@ -20,7 +20,7 @@ def test_base_config_matches_spec_defaults() -> None:
     # and the BOCPD hazard and prior (FR-14). Every other value is the spec default.
     assert cfg.risk.estimator == "ewma"
     assert cfg.regime.hmm.n_states == 4
-    assert cfg.regime.bocpd.hazard_lambda_days == 100
+    assert cfg.regime.bocpd.hazard_lambda_days == 500
     data = cfg.model_dump()
     data["risk"]["estimator"] = "ledoit_wolf"
     data["regime"]["hmm"]["n_states"] = "auto"

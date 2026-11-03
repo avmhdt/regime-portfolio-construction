@@ -172,7 +172,7 @@ Answered in the main session and relayed by the 15-projects review session.
 |---|---|---|
 | K (D-05) | 4. BIC 15,657 against 15,684 for K = 3 and 15,893 for K = 2, on 3,003 days from 1993-02-02 to 2004-12-31 | Rule fixed beforehand |
 | BOCPD (FR-14) | Hazard 1/100, α0 = 2, β0 = 1.189e-4. Highest pre-2005 predictive log-likelihood (9,781.0, against 9,776.3 at 1/250) | Rule fixed beforehand |
-| BOCPD validation (3b) | **Fails at the chosen hazard:** about 6.8 false alarms per 1,000 stationary days, against ≤ 1. A grid over hazard × α0 (8 replications each) shows the same code at 0.4–0.8 per 1,000 at hazard 1/500, with ≥ 4 of 5 shifts detected in 88–100% of replications. Detection (3a) passes at the chosen hazard. The test is an expected failure pending the owner's ruling | Not retuned to pass: the hazard was chosen by the preregistered rule |
+| BOCPD validation (3b) | Superseded by the owner ruling below (reselected hazard 1/500 passes). **Failed at the first chosen hazard:** about 6.8 false alarms per 1,000 stationary days, against ≤ 1. A grid over hazard × α0 (8 replications each) shows the same code at 0.4–0.8 per 1,000 at hazard 1/500, with ≥ 4 of 5 shifts detected in 88–100% of replications. Detection (3a) passes at the chosen hazard. The test is an expected failure pending the owner's ruling | Not retuned to pass: the hazard was chosen by the preregistered rule |
 | Fixed during M5 | An integer prior (`mu0 = 0`) made Numba compile integer arrays for the running means, which broke BOCPD. Every argument is now cast to float. A test checks the result against a textbook implementation to 1e-12 | — |
 | Label-switch count (FR-13) | A switch is a change, between consecutive refits, of the alignment permutation applied on top of the canonical order. The first real run counted every refit whose aligned labels differed from canonical order (231 of 285), which double-counts after the first real switch | A persistent relabelling is one event, not one per refit |
 | HMM fitting speed | hmmlearn `implementation="scaling"` (about 2× faster than `"log"`), refits in parallel over `REGPORT_N_JOBS` processes (8 for the real run, with BLAS threads at 1). The full walk-forward (285 refits × 10 restarts) took 533 s on the reference PC (NFR-01: ≤ 30 min). Seeds are per refit, so results don't depend on the job count | Owner's 8-thread limit |
@@ -180,3 +180,37 @@ Answered in the main session and relayed by the 15-projects review session.
 | Missing macro releases | In feature set B a missing month (e.g. October 2025, during the US government shutdown) carries the last known value forward | Uses no later data |
 | BAA10Y in reports | `reports/regimes.md` tabulates state emissions for the equity-return feature only | P-07 ruling: BAA10Y is a model input, never tabulated |
 | Smoothed probabilities | Own forward–backward pass in `regport.report.figures.smoothed_for_illustration`, with the final refit's parameters. Equals hmmlearn's `predict_proba` to 1e-10 in a test | DQ-08 |
+
+## Owner rulings on M5 (2026-11-03)
+
+Relayed by the 15-projects review session.
+
+1. **BOCPD hazard: "Constrained reselection".**
+   - **Rule:** the reselection, on pre-2005 and synthetic data only, keeps the settings that pass both validation checks and picks the highest pre-2005 predictive log-likelihood among them. The rule was committed (537b5d6) before it ran.
+   - **Result:** hazard 1/500, α0 = 2.
+   - **On record:** the original choice of 1/100 failed (3b) with 6.4–6.8 false alarms per 1,000 days. That stays in `docs/preregistration.md` under Deviations, with the full table.
+   - **Tests:** `tests/validation/test_bocpd.py` checks item (3) at the configured hazard (5 replications in CI; 20, and the 1/100 failure, under `slow`).
+2. **"Variance shifts (×3)": "Std dev ×3, report both".**
+   - **Selection:** uses the standard-deviation reading (variance ×9).
+   - **The literal variance reading** is reported for every setting: at most 4 of 20 replications detect ≥ 4 of 5 shifts, and 1 of 20 at the chosen setting.
+   - **Ambiguity:** the spec's wording is ambiguous. This reading was chosen after the results were seen.
+3. **Effect on outputs.** The BOCPD outputs were regenerated. P(run length < 21) is now above 0.5 on 5.9% of OOS days, against 11.0% at 1/100. The HMM is unaffected.
+
+| Hazard | α0 | (3a) reps with ≥ 4 of 5 (std dev ×3) | (3a) under the variance reading | (3b) false alarms per 1,000 | Passes | Pre-2005 predictive log-lik. |
+|---|---|---|---|---|---|---|
+| 1/100 | 2 | 20 | 4 | 6.36 | no | 9,781.00 |
+| 1/100 | 5 | 20 | 2 | 5.13 | no | 9,764.32 |
+| 1/100 | 10 | 20 | 2 | 5.04 | no | 9,742.97 |
+| 1/100 | 20 | 20 | 2 | 4.87 | no | 9,709.05 |
+| 1/250 | 2 | 19 | 1 | 1.75 | no | 9,776.30 |
+| 1/250 | 5 | 19 | 1 | 1.36 | no | 9,763.07 |
+| 1/250 | 10 | 19 | 1 | 1.35 | no | 9,744.02 |
+| 1/250 | 20 | 18 | 1 | 1.33 | no | 9,712.40 |
+| **1/500** | **2** | **19** | **1** | **0.67** | **yes** | **9,768.48** |
+| 1/500 | 5 | 19 | 1 | 0.56 | yes | 9,757.96 |
+| 1/500 | 10 | 19 | 1 | 0.56 | yes | 9,740.02 |
+| 1/500 | 20 | 15 | 0 | 0.53 | no | 9,710.30 |
+| 1/1000 | 2 | 18 | 0 | 0.30 | yes | 9,760.31 |
+| 1/1000 | 5 | 19 | 0 | 0.23 | yes | 9,751.76 |
+| 1/1000 | 10 | 18 | 0 | 0.21 | yes | 9,734.80 |
+| 1/1000 | 20 | 14 | 0 | 0.20 | no | 9,706.80 |

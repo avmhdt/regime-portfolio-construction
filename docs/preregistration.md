@@ -65,4 +65,26 @@ Does a regime layer built from strictly filtered probabilities improve out-of-sa
   - **(3b) false alarms:** 10,000 stationary days at σ. Count onsets (crossings above 0.5) after a 100-day burn-in. The setting passes if the mean over the 20 replications is at most 1.0 per 1,000 days.
   - **Choice:** among the settings that pass both, the highest pre-2005 predictive log-likelihood. If none passes, nothing changes and the owner is told.
   - **Also reported:** detection under the literal "variance ×3" reading (σ and √3σ).
-- **Result:** recorded below once the reselection has run.
+- **Result (run 2026-11-03, 20 replications per setting, σ = s = 0.0109):** hazard **1/500** with α0 = 2 and β0 = 1.189e-4. It is the passing setting with the highest pre-2005 predictive log-likelihood. `configs/base.yaml` now uses it for every run. The headline table above keeps the original 1/100, as written at registration.
+
+| Hazard | α0 | (3a) reps with ≥ 4 of 5 (std dev ×3) | (3a) under the variance reading | (3b) false alarms per 1,000 | Passes | Pre-2005 predictive log-lik. |
+|---|---|---|---|---|---|---|
+| 1/100 | 2 | 20 | 4 | 6.36 | no | 9,781.00 |
+| 1/100 | 5 | 20 | 2 | 5.13 | no | 9,764.32 |
+| 1/100 | 10 | 20 | 2 | 5.04 | no | 9,742.97 |
+| 1/100 | 20 | 20 | 2 | 4.87 | no | 9,709.05 |
+| 1/250 | 2 | 19 | 1 | 1.75 | no | 9,776.30 |
+| 1/250 | 5 | 19 | 1 | 1.36 | no | 9,763.07 |
+| 1/250 | 10 | 19 | 1 | 1.35 | no | 9,744.02 |
+| 1/250 | 20 | 18 | 1 | 1.33 | no | 9,712.40 |
+| **1/500** | **2** | **19** | **1** | **0.67** | **yes** | **9,768.48** |
+| 1/500 | 5 | 19 | 1 | 0.56 | yes | 9,757.96 |
+| 1/500 | 10 | 19 | 1 | 0.56 | yes | 9,740.02 |
+| 1/500 | 20 | 15 | 0 | 0.53 | no | 9,710.30 |
+| 1/1000 | 2 | 18 | 0 | 0.30 | yes | 9,760.31 |
+| 1/1000 | 5 | 19 | 0 | 0.23 | yes | 9,751.76 |
+| 1/1000 | 10 | 18 | 0 | 0.21 | yes | 9,734.80 |
+| 1/1000 | 20 | 14 | 0 | 0.20 | no | 9,706.80 |
+
+- **Under the literal "variance ×3" reading,** detection fails for every setting (at most 4 of 20 replications). The standard-deviation reading was chosen after these results were seen, and that is disclosed here and in `docs/decisions.md` (owner ruling: use the standard deviation for selection, report both).
+- **When:** committed before any real-data backtest or grid row.

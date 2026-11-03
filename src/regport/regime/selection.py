@@ -86,3 +86,89 @@ def choose_bocpd(x: F64, max_run_length: int, short_run_days: int) -> BOCPDChoic
     best = max(table, key=lambda r: (r["predictive_loglik"], -r["hazard_lambda"]))
     prior = NormalGammaPrior(0.0, 1.0, best["alpha0"], best["beta0"])
     return BOCPDChoice(best["hazard_lambda"], prior, table)
+
+
+# Constrained reselection (owner ruling 2026-11-03; rule in docs/preregistration.md).
+SEGMENT = 400
+N_SHIFTS = 5
+REPLICATIONS = 20
+DETECT_WINDOW = 10
+STATIONARY_DAYS = 10_000
+BURN_IN = 100
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    hazard_lambda: float
+    alpha0: float
+    detect_pass_reps: int  # replications with >= 4 of 5 shifts flagged (std dev x3)
+    detect_pass_reps_variance: int  # the same under the literal "variance x3" reading
+    false_alarms_per_1000: float  # mean over replications
+
+    replications: int = REPLICATIONS
+
+    @property
+    def passes(self) -> bool:
+        """>= 90% of replications detect >= 4 of 5 shifts, and <= 1 false alarm per 1,000."""
+        return (
+            self.detect_pass_reps >= 0.9 * self.replications and self.false_alarms_per_1000 <= 1.0
+        )
+
+
+def _shift_series(rng: np.random.Generator, sigma: float, ratio: float) -> F64:
+    return np.concatenate(
+        [rng.normal(0.0, sigma * (ratio if i % 2 else 1.0), SEGMENT) for i in range(N_SHIFTS + 1)]
+    )
+
+
+def _flagged(cp_short: F64, level: float = 0.5) -> int:
+    starts = [SEGMENT * i for i in range(1, N_SHIFTS + 1)]
+    return sum(bool((cp_short[s : s + DETECT_WINDOW + 1] > level).any()) for s in starts)
+
+
+def validate_setting(
+    args: tuple[float, float, float, int, int, int],
+    replications: int = REPLICATIONS,
+) -> ValidationResult:
+    """Validation item (3) for one hazard and prior strength, with fixed seeds."""
+    lam, a0, sigma, max_rl, short, seed = args
+    prior = NormalGammaPrior(0.0, 1.0, a0, (a0 - 1.0) * sigma**2)
+    detect = detect_var = 0
+    alarms = []
+    for rep in range(replications):
+        rng = np.random.default_rng([seed, rep])
+        res = bocpd(_shift_series(rng, sigma, 3.0), lam, prior, max_rl, short)
+        detect += _flagged(res.cp_prob_short) >= 4
+        res_v = bocpd(_shift_series(rng, sigma, float(np.sqrt(3.0))), lam, prior, max_rl, short)
+        detect_var += _flagged(res_v.cp_prob_short) >= 4
+        p = bocpd(rng.normal(0.0, sigma, STATIONARY_DAYS), lam, prior, max_rl, short).cp_prob_short[
+            BURN_IN:
+        ]
+        onsets = int(((p[1:] > 0.5) & (p[:-1] <= 0.5)).sum())
+        alarms.append(onsets * 1000.0 / (p.size - 1))
+    return ValidationResult(lam, a0, detect, detect_var, float(np.mean(alarms)), replications)
+
+
+def choose_bocpd_constrained(
+    x: F64, max_run_length: int, short_run_days: int, seed: int, n_jobs: int = 1
+) -> tuple[BOCPDChoice | None, list[ValidationResult]]:
+    """Highest pre-2005 predictive log-likelihood among settings passing validation item (3)."""
+    sigma = float(np.std(x, ddof=1))
+    base = choose_bocpd(x, max_run_length, short_run_days)
+    jobs = [
+        (lam, a0, sigma, max_run_length, short_run_days, seed)
+        for lam in HAZARD_GRID
+        for a0 in ALPHA_GRID
+    ]
+    if n_jobs > 1:
+        with ProcessPoolExecutor(max_workers=n_jobs) as pool:
+            checks = list(pool.map(validate_setting, jobs))
+    else:
+        checks = [validate_setting(j) for j in jobs]
+    passing = {(c.hazard_lambda, c.alpha0) for c in checks if c.passes}
+    candidates = [r for r in base.table if (r["hazard_lambda"], r["alpha0"]) in passing]
+    if not candidates:
+        return None, checks
+    best = max(candidates, key=lambda r: (r["predictive_loglik"], -r["hazard_lambda"]))
+    prior = NormalGammaPrior(0.0, 1.0, best["alpha0"], best["beta0"])
+    return BOCPDChoice(best["hazard_lambda"], prior, base.table), checks

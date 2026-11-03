@@ -2,7 +2,7 @@
 
 > Detect market regimes in real time and compare allocation methods honestly against the 1/N benchmark.
 
-**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; M5 (regime layer) is built, pending an owner ruling on one BOCPD validation threshold; the research memo replaces this README at M7.
+**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; M5 (regime layer, preregistration) is done; the research memo replaces this README at M7.
 
 | | |
 |---|---|

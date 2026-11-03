@@ -42,7 +42,7 @@ regime:
     state_cov_shrinkage: 0.5
   bocpd:
     series: spy_logret
-    hazard_lambda_days: 100       # chosen on 1993-02 to 2004-12 (docs/preregistration.md)
+    hazard_lambda_days: 500       # constrained reselection, 2026-11-03 (docs/preregistration.md, Deviations)
     prior: {mu0: 0.0, kappa0: 1.0, alpha0: 2.0, beta0: 1.1891896901219458e-4}   # beta0 = (alpha0 - 1) x pre-2005 variance
     max_run_length: 1500
     short_run_days: 21
