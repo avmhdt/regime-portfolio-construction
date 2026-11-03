@@ -130,3 +130,4 @@ Answered in the main session and relayed by the 15-projects review session.
 - **Portfolio returns:** fixed weights over the h days. The h-day portfolio return is the weighted sum of each asset's compounded h-day return. The forecast is `sqrt(w' Σ_daily w · h)`.
 - **Min-variance in the evaluation:** FR-17's long-only problem with the 0.40 cap. The cap is raised to 1/N when fewer than three assets make 0.40 infeasible.
 - **EWMA:** RiskMetrics zero-mean recursion with λ = 0.5^(1/63) over the 504-day window, weights normalized to sum to 1, which is the bias correction. Sample, Ledoit–Wolf and OAS demean.
+- **Reproducibility (NFR-02):** repeated runs give min-variance weights that differ at about 1e-15 (cvxpy with CLARABEL), so cov-eval tables are equal after rounding to 1e-10, which is NFR-02's rule, rather than bit for bit. `reports/tables/*.csv` are written rounded to 10 decimals.

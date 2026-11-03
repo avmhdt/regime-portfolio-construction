@@ -80,6 +80,11 @@ mypy_path = ["src"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
+module = ["cvxpy", "cvxpy.*"]
+follow_imports = "skip"
+follow_untyped_imports = false
+
+[[tool.mypy.overrides]]
 module = [
     "cvxpy.*",
     "hmmlearn.*",

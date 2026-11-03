@@ -157,5 +157,39 @@ def data_check(config: ConfigOption = DEFAULT_CONFIG) -> None:
         raise typer.Exit(code=1)
 
 
+@app.command("cov-eval")
+def cov_eval(
+    config: ConfigOption = DEFAULT_CONFIG,
+    estimators: Annotated[
+        str, typer.Option("--estimators", help="Comma-separated: sample,ewma,ledoit_wolf,oas.")
+    ] = "sample,ewma,ledoit_wolf,oas",
+    horizons: Annotated[
+        str, typer.Option("--horizons", help="Comma-separated horizons in trading days.")
+    ] = "1,5,21",
+) -> None:
+    """Out-of-sample covariance evaluation (FR-10); writes reports/cov_eval.md and the table."""
+    import polars as pl
+
+    from regport.report.cov_eval import write_cov_eval
+    from regport.risk.evaluation import run_cov_eval, summarize
+
+    cfg, settings, _ = _setup(config)
+    path = settings.data_dir / "processed" / "returns_daily.parquet"
+    if not path.exists():
+        typer.echo("error: run `regport data build` first", err=True)
+        raise typer.Exit(code=1)
+    result = run_cov_eval(
+        pl.read_parquet(path),
+        cfg,
+        [e.strip() for e in estimators.split(",") if e.strip()],
+        [int(h) for h in horizons.split(",") if h.strip()],
+    )
+    table = summarize(result)
+    for name, out in write_cov_eval(
+        result, table, settings.reports_dir, settings.results_dir
+    ).items():
+        typer.echo(f"{name:<7} {out}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

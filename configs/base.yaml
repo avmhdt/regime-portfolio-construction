@@ -19,7 +19,7 @@ sample:
   oos_end: null                 # null = last complete month
   estimator_selection_end: 2014-12-31   # D-12
 risk:
-  estimator: ledoit_wolf        # sample | ewma | ledoit_wolf | oas
+  estimator: ewma               # sample | ewma | ledoit_wolf | oas; chosen by D-12 (reports/cov_eval.md)
   window_days: 504
   ewma_half_life_days: 63
   eval_horizons_days: [1, 5, 21]
