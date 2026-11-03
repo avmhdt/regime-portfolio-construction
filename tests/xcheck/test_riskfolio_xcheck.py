@@ -66,7 +66,7 @@ def test_erc_matches_riskfolio(synthetic_panel: tuple[pl.DataFrame, pl.DataFrame
             # ours; the difference must be explained by that, and stay small.
             explained.append((diff, their_gap, ours_gap))
             assert their_gap > 100 * ours_gap and diff <= 1e-5
-    assert sum(d <= 1e-6 for d in diffs) >= len(diffs) - 3
+    assert max(diffs) <= 1e-5 and len(diffs) == 23
 
 
 def test_hrp_matches_riskfolio(synthetic_panel: tuple[pl.DataFrame, pl.DataFrame]) -> None:

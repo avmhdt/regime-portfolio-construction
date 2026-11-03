@@ -3,8 +3,9 @@
 Regenerate only on purpose, with the reason in the commit message:
 ``REGPORT_UPDATE_GOLDEN=1 uv run pytest tests/golden``.
 
-Solver-based optimizers (min-variance, mean-variance) are compared within 1e-8, because
-interior-point results differ in the last digits across platforms; the rest within 1e-10.
+Values are stored rounded to 1e-10. Solver-based optimizers (min-variance, mean-variance) are
+compared within 1e-8, because interior-point results differ in the last digits across
+platforms; the rest within 1e-9, since two values 1e-11 apart can round 1e-10 apart.
 """
 
 from __future__ import annotations
@@ -75,7 +76,7 @@ def test_golden_fixture(
         pytest.skip("golden file rewritten")
     frozen = json.loads(GOLDEN.read_text(encoding="utf-8"))
     for name in OPTIMIZERS:
-        tol = TOL.get(name, 1e-10)
+        tol = TOL.get(name, 1e-9)
         got, want = current[name], frozen[name]
         assert got["n_obs"] == want["n_obs"], name
         for key in METRICS:
