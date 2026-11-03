@@ -1,0 +1,81 @@
+# Headline experiment config (spec §10). Unknown keys are errors.
+project: regime-portfolio-construction
+seed: 20261030
+data:
+  price_source: auto            # auto | sharadar | tiingo | stooq (D-01; auto = sharadar -> stooq)
+  universe_file: configs/universe.yaml
+  calendar_symbol: SPY
+  min_history_days: 252         # D-02 staggered entry
+  max_ffill_days: 3
+  risk_free_series: DTB3        # D-09
+macro:
+  daily_series: [DTB3, BAA10Y, T10Y3M, VIXCLS]
+  daily_lag_bdays: 1
+  vintage_series: [UNRATE, PAYEMS, INDPRO, CPIAUCSL]
+  vintage_lag_bdays: 1
+sample:
+  data_start: 1993-02-01
+  oos_start: 2005-01-03         # D-13
+  oos_end: null                 # null = last complete month
+  estimator_selection_end: 2014-12-31   # D-12
+risk:
+  estimator: ledoit_wolf        # sample | ewma | ledoit_wolf | oas
+  window_days: 504
+  ewma_half_life_days: 63
+  eval_horizons_days: [1, 5, 21]
+  n_random_portfolios: 100
+regime:
+  usage: hmm                    # none | hmm | bocpd | hmm_bocpd
+  horizon_days: 21
+  hmm:
+    feature_set: A              # A = spy_logret, baa10y_diff ; B = A + unrate_3m_diff, indpro_12m_logdiff
+    n_states: auto              # auto = BIC over candidate_states on pre-OOS data, then fixed (D-05)
+    candidate_states: [2, 3, 4]
+    covariance_type: full
+    window: expanding           # expanding | rolling
+    rolling_days: 2520
+    min_train_days: 2520
+    refit_every_days: 21
+    n_init: 10
+    max_iter: 500
+    tol: 1.0e-6
+    state_cov_shrinkage: 0.5
+  bocpd:
+    series: spy_logret
+    hazard_lambda_days: 250
+    prior: {mu0: 0.0, kappa0: 1.0, alpha0: 2.0, beta0: 1.0e-4}
+    max_run_length: 1500
+    short_run_days: 21
+    trigger_prob: 0.5
+    fast_ewma_half_life_days: 10
+optimizer:
+  name: erc                     # min_variance | erc | hrp | mv_turnover | equal_weight
+  long_only: true
+  max_weight: 0.40              # min_variance and mv_turnover (D-07)
+  mv:
+    risk_aversion: 5.0
+    turnover_penalty_mult: 1.0
+    mean_estimator: james_stein
+    mean_window_days: 252
+  hrp:
+    linkage: single
+  solver: {primary: CLARABEL, fallback: OSQP}
+execution:
+  frequency: monthly            # monthly | weekly (D-06)
+  policy: threshold             # calendar | threshold
+  threshold_abs: 0.02
+  lag_days: 1
+costs:
+  model: proportional
+  override_bps: null            # e.g. 10 for the uniform sensitivity grid (D-04)
+evaluation:
+  benchmark: equal_weight
+  sharpe_test: {methods: [bootstrap, hac], n_boot: 5000, block_size: auto, kernel: parzen, prewhiten: true}
+  multiple_testing: holm
+  ceq_risk_aversion: 1.0
+  stress_windows:
+    gfc_2008: [2007-10-09, 2009-03-09]
+    covid_2020: [2020-02-19, 2020-03-23]
+    rates_2022: [2022-01-03, 2022-10-12]
+logging:
+  experiment_log: results/trial_log.csv

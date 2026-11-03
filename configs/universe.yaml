@@ -1,0 +1,16 @@
+# Fixed 12-ETF universe (D-03). Inception dates are approximate (issuer history, §7) and are
+# verified against the data in reports/data_quality.md. Costs are one-way bps assumptions (D-04),
+# not measured spreads.
+assets:
+  - {symbol: SPY, asset_class: equity, exposure: US large cap, inception: 1993-01-22, sharadar: SPY, tiingo: spy, stooq: spy.us, cost_bps: 1}
+  - {symbol: EFA, asset_class: equity, exposure: Developed ex-US, inception: 2001-08-14, sharadar: EFA, tiingo: efa, stooq: efa.us, cost_bps: 2}
+  - {symbol: EEM, asset_class: equity, exposure: Emerging markets, inception: 2003-04-07, sharadar: EEM, tiingo: eem, stooq: eem.us, cost_bps: 3}
+  - {symbol: VNQ, asset_class: equity, exposure: US REITs, inception: 2004-09-23, sharadar: VNQ, tiingo: vnq, stooq: vnq.us, cost_bps: 2}
+  - {symbol: IEF, asset_class: rates, exposure: US Treasuries 7-10y, inception: 2002-07-22, sharadar: IEF, tiingo: ief, stooq: ief.us, cost_bps: 1}
+  - {symbol: TLT, asset_class: rates, exposure: US Treasuries 20y+, inception: 2002-07-22, sharadar: TLT, tiingo: tlt, stooq: tlt.us, cost_bps: 1}
+  - {symbol: TIP, asset_class: rates, exposure: US TIPS, inception: 2003-12-04, sharadar: TIP, tiingo: tip, stooq: tip.us, cost_bps: 2}
+  - {symbol: LQD, asset_class: credit, exposure: US investment grade, inception: 2002-07-22, sharadar: LQD, tiingo: lqd, stooq: lqd.us, cost_bps: 2}
+  - {symbol: HYG, asset_class: credit, exposure: US high yield, inception: 2007-04-04, sharadar: HYG, tiingo: hyg, stooq: hyg.us, cost_bps: 3}
+  - {symbol: GLD, asset_class: commodity, exposure: Gold, inception: 2004-11-18, sharadar: GLD, tiingo: gld, stooq: gld.us, cost_bps: 2}
+  - {symbol: DBC, asset_class: commodity, exposure: Diversified commodity futures, inception: 2006-02-03, sharadar: DBC, tiingo: dbc, stooq: dbc.us, cost_bps: 5}
+  - {symbol: UUP, asset_class: fx, exposure: US dollar index (long USD), inception: 2007-02-20, sharadar: UUP, tiingo: uup, stooq: uup.us, cost_bps: 5}
