@@ -148,3 +148,20 @@ Answered in the main session and relayed by the 15-projects review session.
 | riskfolio-lib | Not installed locally (a large dependency tree, and `uv` can't cap download speed under the 10 MB/s rule). The xcheck job runs those tests in CI | Owner's bandwidth rule |
 | ERC cross-check (AC-W-08) | Against riskfolio-lib, ERC matches within 1e-6 on 11 of the 23 matrices and differs by at most 1.7e-6 on the other 12. In every one of those 12, riskfolio's own weights miss equal risk contributions by more than 100 times ours, which stop at max \|RC − 1/N\| ≤ 1e-10. The test checks that explanation case by case and caps any difference at 1e-5. This is the spec's "documented, explained difference" | `rp_optimization` solves a convex program at its solver's default tolerance, so its weights carry about 1e-6 of solver error. HRP matches within 1e-6 on all 23 |
 | Golden tolerance | Golden values are stored rounded to 1e-10 and compared within 1e-9, or 1e-8 for solver-based optimizers | CI on Ubuntu found an ERC weight one unit apart in the tenth decimal, a rounding-boundary effect |
+
+## M5 protocol, fixed before any regime-model selection or validation run (2026-11-03)
+
+- **HMM states (D-05):**
+  - K ∈ {2, 3, 4} is chosen by the lowest BIC, `−2 log L + p log T`.
+  - The data: feature set A on 1993-02-02 to 2004-12-31, standardized on that window, with the French market proxy before 1998.
+  - Each K is fitted once with the walk-forward fit settings (`n_init` 10, seeded, `max_iter` 500, `tol` 1e-6).
+  - That K is then fixed for every run, feature set B included.
+- **BOCPD hyperparameters (FR-14):**
+  - The grid: hazard λ ∈ {100, 250, 500, 1000} days and α0 ∈ {2, 5, 10, 20}, with `μ0 = 0`, `κ0 = 1` and `β0 = (α0 − 1) · s²`. Here `s²` is the variance of the SPY (proxy) log return on 1993-02-02 to 2004-12-31, so the prior mean of the variance equals the pre-2005 sample variance.
+  - The chosen point has the highest one-step predictive log-likelihood `Σ_t log p(x_t | x_1:t−1)` on that same window.
+  - `max_run_length` 1500, `short_run_days` 21 and `trigger_prob` 0.5 stay at the spec defaults.
+- **Validation item (3), BOCPD detection:**
+  - It runs with the chosen λ and α0, and with `β0 = (α0 − 1) σ²` for the synthetic base standard deviation σ.
+  - **Ambiguity:** "5 variance shifts (×3)" can mean the variance or the standard deviation multiplied by 3. Both are run and both are reported. A variance tripling carries about 0.45 nats of evidence per observation against a prior change-point log-odds of about −5.5 at λ = 250, so detecting it within 10 observations is close to impossible. The standard-deviation reading (variance ×9) is the one tested against the threshold.
+  - **False alarms:** the onsets per 1,000 stationary observations, i.e. days where `cp_prob_short` crosses above 0.5, after a 100-day burn-in.
+- **Status:** the reading of "×3" is the agent's choice, recorded here. It goes to the owner if the result depends on it.
