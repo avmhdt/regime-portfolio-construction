@@ -1,0 +1,24 @@
+{
+ "rule": "hash match, or floats within 1e-9 and other cells equal",
+ "tables": {
+  "ablation.csv": "b48b6298612ade53b8334626e98e80da78c6bd2b60ed35af82f815e2206cdb1d",
+  "constraint_audit.csv": "a5278641c6938614db948998da476bd4945a1ce5112926c6b72166854c6201fd",
+  "cov_eval.csv": "995612101878c51c245d8e9818bddb035bfb392c6f36793871b0800bc7b1ed3e",
+  "data_coverage.csv": "ce8db039bada75f469f5ac1a99e8109110528e9572a13c16bc613ce36e4b9465",
+  "oos_vs_1n.csv": "4cf9e9abbfb7d62ce3ea7106f3445861206214fd47d738358d14bd2743f89581",
+  "regime_summary.csv": "77f6fb494fddf3045b2da3df8813cf1b0d7e7f670d11ecfbd3e452db0e093d0b",
+  "robustness_alfred.csv": "27cf32fa3a98e029a1d12a27b4aa08c4d6ac00ef6f011c39049e28ef63d9e6d8",
+  "robustness_alfred_regime.csv": "70d34fa9b9f1c44abb10ec08d8171e0b55ff50225b73e61368f1d066706df58d",
+  "robustness_common_start.csv": "53821f5363ef537f75e484fe2aa177846e12c778c0563168b10589c0facf7263",
+  "robustness_costs.csv": "881f6416ddb8710eb06de8dbb6b69be93c329f0f30417c2aa57cbd78e2192c41",
+  "robustness_french.csv": "2fe485fe1dd93e77a02033bbf58cf4f1e4075e2d5d194a0c1b9d988c688d59e0",
+  "scaling.csv": "befade56dd583bd2a3edeb90de4c88d45af5f7ea63d85c145daf8d2c45cb58b9",
+  "scaling_condition.csv": "16765abc8bd514cef729324acc2c44b9571a14dab5a1a7610598b46b107b10a4",
+  "stress.csv": "93258d036be31eb1f89223ac8009a266a257cab9e5cfce57faf5474ae90a5e72",
+  "trials.csv": "18c26ba8089c6dabb0828c589b15bc3fbcaa98c0858557e9df4f9b4972c476c2"
+ },
+ "uncompared": {
+  "scaling.csv": "wall-clock times are reported, not compared",
+  "trials.csv": "the trial count grows with every run, including this one"
+ }
+}

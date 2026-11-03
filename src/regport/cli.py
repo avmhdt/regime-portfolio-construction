@@ -484,5 +484,86 @@ def bench_scaling(
         typer.echo(f"{key:<9} {path}")
 
 
+def _finish_reports(config: Path, settings: Settings) -> Path:
+    """Fill the README result blocks from the tables and write reports/manifest.json."""
+    import json
+
+    from regport.eval.grid import latest_manifest
+    from regport.report.build import fill_readme, write_manifest
+    from regport.report.readme import render_blocks
+
+    cfg = load_config(config)
+    head = json.loads(latest_manifest(settings.results_dir).read_text(encoding="utf-8")).get(
+        "headline"
+    ) or {"optimizer": cfg.optimizer.name, "regime": "hmm_A"}
+    headline = f"{head['optimizer']}+{head['regime']}"
+    blocks = render_blocks(settings.reports_dir / "tables", headline, cfg.risk.estimator)
+    readme = Path("README.md")
+    if readme.exists():
+        typer.echo(f"README blocks: {', '.join(fill_readme(readme, blocks)) or 'none'}")
+    return write_manifest(settings.reports_dir)
+
+
+@app.command()
+def report(config: ConfigOption = DEFAULT_CONFIG) -> None:
+    """Rebuild every report from saved outputs (no new backtests) and reports/manifest.json."""
+    settings = get_settings()
+    data_check(config)
+    cov_eval(config)
+    regime_report(config)
+    evaluate(config)
+    stress(config)
+    robustness(config, suite="all", report_only=True)
+    typer.echo(f"manifest {_finish_reports(config, settings)}")
+
+
+@app.command()
+def reproduce(
+    config: ConfigOption = DEFAULT_CONFIG,
+    check: Annotated[
+        bool, typer.Option("--check", help="Exit 1 unless every table matches the manifest.")
+    ] = False,
+) -> None:
+    """Full pipeline from raw data: build, check, regimes, cov-eval, grid, evaluate, stress,
+    robustness, scaling and reports. Every backtest it runs is logged as a trial."""
+    import json
+    import shutil
+    import time
+
+    from regport.report.build import check_tables
+
+    settings = get_settings()
+    started = time.perf_counter()
+    reports = settings.reports_dir
+    reference: dict[str, str] = {}
+    ref_dir = settings.results_dir / "cache" / "reproduce_reference"
+    if (reports / "manifest.json").exists():
+        reference = json.loads((reports / "manifest.json").read_text(encoding="utf-8"))["tables"]
+        shutil.rmtree(ref_dir, ignore_errors=True)
+        shutil.copytree(reports / "tables", ref_dir)
+    shutil.rmtree(settings.results_dir / "regime", ignore_errors=True)  # recompute, don't reuse
+    data_build(config)
+    data_check(config)
+    regime_run(config, model="all", features=None, force=True)
+    cov_eval(config)
+    grid(Path("configs/ablation.yaml"))
+    evaluate(config)
+    stress(config)
+    robustness(config, suite="all", report_only=False)
+    regime_report(config)
+    bench_scaling(config)
+    _finish_reports(config, settings)
+    typer.echo(f"reproduce finished in {time.perf_counter() - started:.0f} s")
+    if check:
+        if not reference:
+            typer.echo("error: no reports/manifest.json to check against", err=True)
+            raise typer.Exit(code=1)
+        results = check_tables(reference, ref_dir, reports)
+        for r in results:
+            typer.echo(f"[{'OK ' if r.ok else 'BAD'}] {r.table:<34} {r.status} {r.detail}")
+        if not all(r.ok for r in results):
+            raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

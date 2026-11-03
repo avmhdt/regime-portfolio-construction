@@ -1,0 +1,2 @@
+trial_log_rows,failed_rows,distinct_configurations,selected,selected_sharpe,var_trial_sharpe_annual,expected_max_sharpe_annual,dsr
+81,0,81,erc+bocpd,0.7292445136,0.0245263913,0.3845619026,0.9997276164

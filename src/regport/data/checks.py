@@ -751,4 +751,23 @@ def write_report(report: CheckReport, path: Path) -> Path:
                 lines += ["", f"### {title}", "", *_md_table(rows)]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    coverage = next((c for c in report.checks if c.id == "AC-W-05"), None)
+    eligibility = next((c for c in report.checks if c.id == "DQ-07"), None)
+    if coverage is not None and eligibility is not None and coverage.table:
+        first_eligible = {
+            str(r["symbol"]): str(r["first eligible date"]) for r in eligibility.table
+        }
+        rows = [
+            {
+                "symbol": r["symbol"],
+                "first_date": str(r["first date"]),
+                "first_eligible": first_eligible.get(str(r["symbol"]), ""),
+                "rows": r["rows"],
+            }
+            for r in coverage.table
+            if "first date" in r
+        ]
+        from regport.report.tables import write_csv
+
+        write_csv(pl.DataFrame(rows), path.parent / "tables" / "data_coverage.csv")
     return path

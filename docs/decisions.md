@@ -232,3 +232,14 @@ Relayed by the 15-projects review session.
 | Scaling | Timings are wall-clock medians, reported but not frozen in the report-hash check (M7) | They vary between runs |
 | Cost drag | Shown in bps in the Markdown reports; the CSVs keep fractions | Per-asset costs of 1 to 5 bps round to 0.000 as fractions |
 | Trial SHA provenance | All 81 rows record commit `687268b`. The M6 branch was rebased onto `main` before its PR, so that commit is kept reachable by the tag `trials/m6-687268b` | A recorded `git_sha` must stay resolvable |
+
+## M7 choices (2026-11-03)
+
+| Topic | Choice | Why |
+|---|---|---|
+| README numbers | Every result number in the README sits in a `<!-- regport:NAME -->` block, rendered from `reports/tables/` by `regport report`. The prose around the blocks is qualitative | AC-W-04: no hand-typed figures |
+| README length | 2,098 readable words: code blocks, link targets and table rules excluded; generated tables included | AC-H-08 (≤ 2,500 words plus figures) |
+| Published tables | No run ids. The cell-to-run mapping is in the committed `results/grids/*.json` | Run ids change on every rerun, so tables with them could never match a manifest |
+| `reproduce --check` | A table passes if its SHA-256 matches `reports/manifest.json`, or if every float is within 1e-9 and every other cell is equal | NFR-02 compares after rounding to 1e-10; solver noise near a rounding boundary can flip the last digit |
+| Uncompared tables | `scaling.csv` (wall-clock timings) and `trials.csv` (the trial count, which grows with every run, the reproduction included) are recorded in the manifest but not compared | They can't be reproduced exactly by design |
+| Reproduction trials | `reproduce` reruns every backtest. Each rerun appends to the trial log with a `reproduce`-free tag of its own suite, so the row count grows while the distinct-configuration count stays the same | FR-25: every backtest invocation is a trial |

@@ -22,7 +22,7 @@ from regport.regime.features import FEATURE_SETS, PROXY_LABEL
 from regport.regime.filter import forward_filter
 from regport.regime.hmm import HMMParams
 from regport.report.figures import bocpd_heatmap, filtered_vs_smoothed, smoothed_for_illustration
-from regport.report.tables import md_table
+from regport.report.tables import md_table, write_csv
 
 
 @dataclass(frozen=True)
@@ -209,6 +209,20 @@ def write_regimes_report(
         "",
         "![BOCPD run length](figures/bocpd_run_length.png)",
     ]
+    summary = pl.DataFrame(
+        {
+            "n_states": [k],
+            "feature_set": [cfg.regime.hmm.feature_set],
+            "refits": [len(records)],
+            "first_fit_end": [records["0"]["fit_end"]],
+            "label_switches": [len(fits["label_switches"])],
+            "proxy_days": [proxy.height],
+            "bocpd_hazard_days": [b.hazard_lambda_days],
+            "bocpd_trigger_share_oos": [float(np.mean(oos_cp > b.trigger_prob))],
+            **{f"smoother_lead_days_{t.window}": [t.lead_days] for t in timing},
+        }
+    )
+    write_csv(summary, reports_dir / "tables" / "regime_summary.csv")
     md = reports_dir / "regimes.md"
     md.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return {"report": md, "filtered_vs_smoothed": fig1, "bocpd": fig2}

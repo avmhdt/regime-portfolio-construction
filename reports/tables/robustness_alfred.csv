@@ -1,2 +1,2 @@
-suite,variant,optimizer,regime,run_id,sharpe,delta_sharpe_vs_1n,p_hac,ceq,annual_volatility,annual_turnover,max_drawdown
-alfred,latest,erc,hmm_B_latest,f1d16303-e371-4ef7-ae27-7f19dc9c3b67,0.6947754923,,,0.0321617005,0.0479530059,0.6691744531,-0.1326997884
+suite,variant,optimizer,regime,sharpe,delta_sharpe_vs_1n,p_hac,ceq,annual_volatility,annual_turnover,max_drawdown
+alfred,latest,erc,hmm_B_latest,0.6947754923,,,0.0321617005,0.0479530059,0.6691744531,-0.1326997884
