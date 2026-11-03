@@ -22,7 +22,15 @@ Owner decisions copied from the owner-level `DECISIONS.md` on 2026-11-03, follow
 - **Sharadar licence:** Personal Use License. Sharadar replied in writing on 2026-10-31 that public code, aggregate results, job applications, aggregate cross-checks and hosted coding tools are allowed. Publishing stays aggregate-only, with no security-level data (D-11).
 - **FRED (P-04):** the owner has the FRED key; it goes in `.env` as `FRED_API_KEY`.
 - **AQR (P-08):** the owner downloaded the workbooks manually from aqr.com/Insights/Datasets into `D:\trading-strategy-brainstorm\backtest-overfitting-lab\data\raw\aqr\` (manifest dated 2026-11-02). The ones this project needs ("Century of Factor Premia Monthly.xlsx", "Time Series Momentum Factors Monthly.xlsx") are copied into this repo's git-ignored `data/raw/aqr/` with their source and SHA-256 recorded; they are never committed.
-- **P-07 terms review:** pending, before M2.
+- **P-07 terms review and D-11 (ruled 2026-11-03): confirmed.** Derived aggregate tables and figures may be published on these terms:
+  - **FRED/ALFRED:** the README carries FRED's notice: "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis."
+  - **BAA10Y:** carries Moody's copyright. It is used only as a model input and is never plotted or tabulated.
+  - **VIXCLS:** Cboe's copyright. It is cited wherever it is used.
+  - **DTB3, T10Y3M and the ALFRED series:** government data.
+  - **Kenneth French:** the library is cited, and its files are never redistributed. Its page states no terms beyond a copyright notice.
+  - **Stooq:** never committed. No published terms were found for the bulk files.
+  - **Sharadar:** already confirmed in writing; aggregates only.
+- **AQR (ruled 2026-11-03): dropped from everything public.** AQR's site terms prohibit publishing "any information obtained from this Website" without its written consent. The AQR robustness run (FR-06, Could) may be run locally only. Nothing about it is published, not even a statement of its results. It comes back only if AQR gives written permission, which the owner is requesting. `regport fetch all` doesn't touch AQR.
 
 ### Money
 
@@ -58,7 +66,7 @@ D-02 to D-14 stand as written in the spec:
 
 | Milestone | Topic | Choice | Why |
 |---|---|---|---|
-| M1 | FRED key transport | The client sends `Authorization: Bearer` first and falls back to the `api_key` query parameter only if FRED refuses the header. The mode in use is printed by `regport smoke`. URLs are redacted (`api_key=REDACTED`) before any log line or exception, and httpx/httpcore logging is held at WARNING | FRED's v1 `series/observations` endpoint (needed for ALFRED vintages) documents the key only as a query parameter, while the v2 docs use the header. The header route keeps the key out of URLs when FRED accepts it |
+| M1 | FRED key transport | The client sends `Authorization: Bearer` first and falls back to the `api_key` query parameter only if FRED refuses the header. The mode in use is printed by `regport smoke`; on 2026-11-03 FRED refused the header, so the query parameter is what works. URLs are redacted (`api_key=REDACTED`) before any log line or exception, and httpx/httpcore logging is held at WARNING | FRED's v1 `series/observations` endpoint (needed for ALFRED vintages) documents the key only as a query parameter, while the v2 docs use the header. The header route keeps the key out of URLs when FRED accepts it |
 | M1 | Trial-log writer | Own writer in `regport.tracking.experiment_log`, following the contract's reference writer; columns are the ten required ones plus `x_returns_basis` (always `raw`) and `x_note` | Matches the spec's `TrialRow`/`append_trial` API; the contract allows `x_` columns after the ten |
 | M1 | `overfitlab` as a dev dependency | Added from git (`avmhdt/backtest-overfitting-lab`, pinned in `uv.lock`), dev group only, never imported from `src/` | Lets a unit test and the CI step run `overfitlab`'s own validator on the log, rather than skipping with a notice. It is not on PyPI |
 | M1 | Leakage-guard scope | `predict`, `predict_proba` and `score_samples` are banned as calls anywhere in `src/`; hmmlearn may be imported only in `regport/regime/hmm.py`, and `decode` is banned in any module that imports it | A blanket `.decode()` ban would also reject `bytes.decode`; confining hmmlearn to one module keeps the rule exact |
@@ -66,3 +74,22 @@ D-02 to D-14 stand as written in the spec:
 | M1 | Line endings | `.gitattributes` sets `* text=auto eol=lf` | NFR-08 and the trial-log contract need LF; Windows checkouts would otherwise convert `results/trial_log.csv` to CRLF and break the append-only check |
 | M1 | Trial log append-only check | CI compares `results/trial_log.csv` on the PR with the base branch and fails unless the base version is a byte prefix | AC-W-09: no row ever edited or deleted |
 | M1 | Stooq coverage | The snapshot's SPY file starts on 2005-02-25, not 1993 | Found by `regport smoke`. The Stooq fallback therefore cannot supply the 1993-2004 pre-OOS window that D-05 uses to pick K; Sharadar SFP is needed for that, and M2 records each source's first date per symbol |
+| M1 | Smoke test, 2026-11-03 | `regport smoke` passed: DTB3 19,000 rows 1954-01-04 to 2026-10-30; UNRATE 2,199 rows in 800 vintages; SPY from Sharadar SFP, 7,254 rows 1997-12-31 to 2026-11-02. Output, raw files, manifest and source tree scanned for both key values: none found | M1 exit criterion |
+| M2 | Sharadar SFP coverage | SFP starts on 1997-12-31 for SPY; the other 11 ETFs start within 10 trading days of inception. The panel and master calendar therefore start on 1997-12-31 | Pending owner ruling on AC-W-05 for SPY and on the pre-2005 HMM window (D-05, FR-11): see "Open questions" |
+| M2 | Stooq adjustment | Stooq misses about half of HYG's distributions, and disagrees with Sharadar by more than 5 bps on 2-4% of days for most ETFs | DQ-03's 99% agreement rule fails; pending owner ruling |
+| M2 | `close` columns | `prices_daily.close` is Sharadar's `closeunadj` (the schema's "unadjusted"); an extra column `close_splitadj` keeps Sharadar's split-adjusted `close`, used as the price-only series in DQ-03 and for split detection | Unadjusted closes jump at splits (EFA and EEM 2005-06-09, EEM 2008-07-24), so they can't serve as a price-only return series |
+| M2 | `pit_approx` | `macro_pit` carries `pit_approx` as an extra column, so `value_asof` and the table agree; `macro_vintages.pit_approx` marks rows of each series' earliest vintage, the only rows a DQ-10 approximation can use | The schema lists `pit_approx` only on `macro_vintages` |
+| M2 | ALFRED business day | `asof - 1 business day` means one weekday back (`numpy.busday_offset`), not one trading day | A release on an exchange holiday (the jobs report on Good Friday) is public on the next weekday |
+| M2 | Download cap | File downloads stream at no more than 8 MB/s, below the owner's 10 MB/s cap for this PC | Live recorders share the connection |
+| M2 | AQR parser | Deferred to M6, local-only | FR-06 is Could and listed under M6; nothing AQR is published (owner ruling) |
+| M2 | French range check | DQ-11 fails on returns below -100% (impossible); returns above +100% are counted, not failed | Two 1930s days in the 49-industry file (Paper, MedEq) exceed +100%, which is real for thin early portfolios |
+
+## Open questions for the owner
+
+1. **AC-W-05 for SPY.** Sharadar SFP starts on 1997-12-31, five years after SPY's 1993 inception, so the literal criterion fails for SPY alone. Proposed: accept SFP's 1998 start as SPY's coverage start, as a documented exception. This matches `DECISIONS.md`'s "history starts in 1998".
+2. **Pre-2005 regime window.** The spec chooses K by BIC on 1993-02 to 2004-12 (D-05) and needs at least 2,520 training days before the first HMM fit (FR-11). From 1998 there are about 1,760 days before 2005-01-03. Options:
+   - (a) Keep 2,520: the first HMM probabilities arrive around 2008-01, and the regime arms equal "none" before that.
+   - (b) Before 1998, use the Kenneth French daily market return (Mkt-RF + RF) as the SPY return feature for the HMM and BOCPD only, never as an investable return.
+   - (c) Lower `min_train_days` to about 1,750.
+   - Recommended: (b), because it keeps the spec's 1993 window and thresholds.
+3. **DQ-03 agreement.** The spec requires Sharadar and Stooq to agree within 5 bps on at least 99% of days, but Stooq misses distributions. Proposed: keep the threshold, report the failure with its diagnosis as a documented exception, and keep Sharadar as the price source. Sharadar's own adjustment test passes.

@@ -1,0 +1,17 @@
+{
+  "_note": "Synthetic ALFRED output_type=1 rows (not real data). TESTSER: four vintages; January revised on 2020-03-06, February revised on 2020-03-20. LATESER: first vintage 2020-06-05, so earlier decision dates are pit_approx.",
+  "TESTSER": [
+    {"date": "2020-01-01", "value": "100", "realtime_start": "2020-02-07", "realtime_end": "2020-03-05"},
+    {"date": "2020-01-01", "value": "101", "realtime_start": "2020-03-06", "realtime_end": "9999-12-31"},
+    {"date": "2020-02-01", "value": "105", "realtime_start": "2020-03-06", "realtime_end": "2020-03-19"},
+    {"date": "2020-02-01", "value": "106", "realtime_start": "2020-03-20", "realtime_end": "9999-12-31"},
+    {"date": "2020-03-01", "value": "110", "realtime_start": "2020-04-03", "realtime_end": "9999-12-31"}
+  ],
+  "LATESER": [
+    {"date": "2020-01-01", "value": "1.5", "realtime_start": "2020-06-05", "realtime_end": "9999-12-31"},
+    {"date": "2020-02-01", "value": "2.5", "realtime_start": "2020-06-05", "realtime_end": "9999-12-31"},
+    {"date": "2020-03-01", "value": "3.5", "realtime_start": "2020-06-05", "realtime_end": "9999-12-31"},
+    {"date": "2020-04-01", "value": ".", "realtime_start": "2020-06-05", "realtime_end": "9999-12-31"},
+    {"date": "2020-05-01", "value": "5.5", "realtime_start": "2020-06-05", "realtime_end": "9999-12-31"}
+  ]
+}
