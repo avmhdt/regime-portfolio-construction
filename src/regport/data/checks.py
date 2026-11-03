@@ -722,6 +722,7 @@ def _cell(value: object) -> str:
 
 
 def write_report(report: CheckReport, path: Path) -> Path:
+    excepted = [c.id for c in report.checks if c.passed is False and c.exception]
     lines = [
         "# Data quality",
         "",
@@ -730,7 +731,8 @@ def write_report(report: CheckReport, path: Path) -> Path:
         f"- Price source: `{report.source}` (D-01). Cross-check: Stooq snapshot of "
         f"{SNAPSHOT_DATE}.",
         f"- Master calendar: {report.calendar[0]} to {report.calendar[1]}.",
-        f"- Overall: **{'PASS' if report.ok else 'FAIL'}**.",
+        f"- Overall: **{'PASS' if report.ok else 'FAIL'}**"
+        + (f", with documented exceptions for {', '.join(excepted)}." if excepted else "."),
         "",
         "| Check | Title | Result | Summary |",
         "|---|---|---|---|",
