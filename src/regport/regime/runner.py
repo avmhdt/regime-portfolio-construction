@@ -162,6 +162,8 @@ def load_or_run(
     n_jobs: int = 1,
     models: tuple[str, ...] = ("hmm", "bocpd"),
 ) -> RegimeOutputs:
+    if "hmm" in models:
+        _n_states(cfg)  # fail fast on n_states "auto", before reading any data
     features = load_features(cfg, processed)
     out_dir = results_dir / "regime"
     hmm = transmats = None
