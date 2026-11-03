@@ -288,5 +288,98 @@ def regime_report(config: ConfigOption = DEFAULT_CONFIG) -> None:
         typer.echo(f"{name:<22} {path}")
 
 
+GridOption = Annotated[
+    Path, typer.Option("--config", help="Grid config (YAML).", exists=True, dir_okay=False)
+]
+RunsOption = Annotated[
+    str | None, typer.Option("--runs", help="A grid manifest path (default: the latest grid).")
+]
+
+
+@app.command()
+def grid(config: GridOption = Path("configs/ablation.yaml")) -> None:
+    """Run every cell of the ablation grid (FR-28); each cell is one trial-log row."""
+    from regport.eval.grid import load_grid, run_grid
+
+    settings = get_settings()
+    configure_logging(settings.regport_log_level)
+    load_config(load_grid(config).base)
+    typer.echo(f"manifest {run_grid(config, settings)}")
+
+
+def _manifest(settings: Settings, runs: str | None) -> Path:
+    from regport.eval.grid import latest_manifest
+
+    return Path(runs) if runs else latest_manifest(settings.results_dir)
+
+
+@app.command()
+def evaluate(
+    config: ConfigOption = DEFAULT_CONFIG,
+    runs: RunsOption = None,
+    latest_grid: Annotated[bool, typer.Option("--latest-grid", help="Use the latest grid.")] = True,
+    benchmark: Annotated[str, typer.Option("--benchmark")] = "equal_weight",
+) -> None:
+    """Metrics, Ledoit-Wolf tests against 1/N, Holm, ablation, trials and the constraint audit."""
+    from regport.eval.evaluate import compare, constraint_audit, load_runs, trial_summary
+    from regport.report.evaluation import write_evaluation
+
+    cfg, settings, _ = _setup(config)
+    if benchmark != cfg.evaluation.benchmark:
+        raise typer.BadParameter("only the configured benchmark (equal_weight) is supported")
+    manifest = _manifest(settings, runs)
+    loaded, meta = load_runs(manifest)
+    table, ablation = compare(loaded, cfg, settings.regport_n_jobs)
+    log_path = Path(cfg.logging.experiment_log)
+    trials = trial_summary(log_path, table, loaded)
+    audit = constraint_audit(loaded, cfg.optimizer.max_weight, log_path)
+    head = meta.get("headline") or {"optimizer": cfg.optimizer.name, "regime": "hmm_A"}
+    headline = f"{head['optimizer']}+{head['regime']}"
+    dates = loaded[0].returns["date"]
+    for name, path in write_evaluation(
+        table,
+        ablation,
+        trials,
+        audit,
+        loaded,
+        headline,
+        (str(dates[0]), str(dates[-1])),
+        settings.reports_dir,
+    ).items():
+        typer.echo(f"{name:<13} {path}")
+
+
+@app.command()
+def stress(config: ConfigOption = DEFAULT_CONFIG, runs: RunsOption = None) -> None:
+    """Drawdown and recovery statistics in the fixed stress windows (FR-29)."""
+    import json
+
+    import polars as pl
+
+    from regport.eval.evaluate import load_runs
+    from regport.regime.runner import hmm_paths, load_features, run_bocpd, run_hmm
+    from regport.report.regimes import high_volatility_states, params_from_record
+    from regport.report.stress import write_stress
+
+    cfg, settings, _ = _setup(config)
+    loaded, meta = load_runs(_manifest(settings, runs))
+    feats = load_features(cfg, settings.data_dir / "processed")
+    out_dir = settings.results_dir / "regime"
+    probs, _, _ = run_hmm(cfg, feats, out_dir, settings.regport_n_jobs)
+    fits = json.loads(hmm_paths(cfg, feats, out_dir)[1].read_text(encoding="utf-8"))["fits"]
+    high = high_volatility_states(params_from_record(fits[str(max(int(k) for k in fits))]))
+    stress_prob = (
+        probs.filter(pl.col("state").is_in(high.tolist()))
+        .group_by("date", maintain_order=True)
+        .agg(pl.col("p_filtered").sum().alias("p_stress"))
+    )
+    cp = run_bocpd(cfg, feats, out_dir)
+    head = meta.get("headline") or {"optimizer": cfg.optimizer.name, "regime": "hmm_A"}
+    for name, path in write_stress(
+        loaded, cfg, f"{head['optimizer']}+{head['regime']}", stress_prob, cp, settings.reports_dir
+    ).items():
+        typer.echo(f"{name:<11} {path}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

@@ -9,6 +9,8 @@ import polars as pl
 
 
 def cell(value: object, digits: int = 3) -> str:
+    if value is None:
+        return "-"
     if isinstance(value, bool):
         return "yes" if value else "**no**"
     if isinstance(value, float):
