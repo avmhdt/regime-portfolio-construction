@@ -83,3 +83,36 @@ On daily net returns `r` and excess returns `e = r − rf`:
 | Effective number of assets | Mean of `1/Σw²` |
 
 The trial log's `sharpe_annual` is the contract's raw-return Sharpe `mean(r)/std(r)·√252`.
+
+## Regime features (D-05)
+
+- **Set A:** `x_t = (log(1 + r_SPY,t), ΔBAA10Y_t)`. The BAA10Y value at `t` is the latest observation published by `t − 1` business day (DQ-02). Before 1998-01-02, Sharadar has no SPY prices, so the Kenneth French daily market return `Mkt-RF + RF` stands in for SPY (owner ruling). It is a model input only, and each row records its source.
+- **Set B:** adds the 3-month change in UNRATE and the 12-month log change in INDPRO. Both ends come from the ALFRED vintage published by `t − 1` business day (DQ-09). A missing release carries the last value forward.
+
+## Walk-forward HMM (FR-11 to FR-13)
+
+- **Fitting:** a Gaussian HMM with full covariances, fitted by Baum–Welch (hmmlearn `fit` only) on features standardized with their training-window mean and standard deviation. Ten seeded restarts per fit; the best log-likelihood among restarts whose states each hold at least 5% of the filtered mass is kept.
+- **Schedule:** refits every 21 trading days on an expanding window of at least 2,520 days. Fit `k`, with data through `f_k`, serves the dates `f_k … f_{k+1} − 1`. For each of those dates, the filter is re-run from the start of fit `k`'s training window with fit `k`'s parameters, over data up to that date.
+- **Forward filter:** in log space, `log α_t = log b(x_t) + logsumexp_j(log f_{t−1,j} + log A_jk)` and `f_t = α_t / Σα_t`. The prediction is `P(S_{t+1}|x_1:t) = f_t A`. The log-likelihood `Σ_t log Σ_k α_tk` equals hmmlearn's `score` to 1e-8.
+- **Label switching:** states are put in ascending order of their equity-return emission variance. They are then matched to the previous fit's states by the Hungarian algorithm on the symmetric Kullback–Leibler divergence `KL(p‖q) + KL(q‖p)` between Gaussian emissions, in raw feature units. If the matching overrules the canonical order, the matching wins and the event is logged.
+
+## BOCPD (FR-14)
+
+Adams and MacKay (2007), with constant hazard `H = 1/λ` and a Normal–Gamma prior. The predictive distribution of run length `r` is Student-t with `ν = 2α_r`, location `μ_r` and squared scale `β_r(κ_r + 1)/(α_r κ_r)`. The recursion, in log space, is:
+
+- **Growth:** `log P(r_t = r + 1) ∝ log P(r_{t−1} = r) + log π_r(x_t) + log(1 − H)`.
+- **Change point:** `log P(r_t = 0) ∝ logsumexp_r(log P(r_{t−1} = r) + log π_r(x_t)) + log H`.
+- **Posterior update:** `μ' = (κμ + x)/(κ + 1)`, `κ' = κ + 1`, `α' = α + ½` and `β' = β + κ(x − μ)²/(2(κ + 1))`.
+
+Run lengths beyond 1,500 are dropped and the posterior renormalized. The outputs are `P(r_t < 21)`, the MAP run length and the mean run length.
+
+## Regime-conditioned risk inputs (FR-16)
+
+- **Regime covariance:** with filtered weights `w_tk = p_tk / Σ_t p_tk` over the covariance window, `μ_k = Σ_t w_tk r_t` and `Σ_k = Σ_t w_tk (r_t − μ_k)(r_t − μ_k)' / (1 − Σ_t w_tk²)`. Each `Σ_k` is shrunk 50% toward its diagonal. A state with fewer than 30 effective observations falls back to the unweighted moments.
+- **Forward weights:** `π = (1/21) Σ_{j=1}^{21} f_t A^j`.
+- **Mixture covariance:** `Σ = Σ_k π_k (Σ_k + μ_k μ_k') − μ̄ μ̄'` with `μ̄ = Σ_k π_k μ_k`. Mean–variance uses `μ̄` shrunk 50% toward its cross-sectional mean.
+- **BOCPD mode:** when `P(r_t < 21) > 0.5`, the covariance is an EWMA with half-life 10 days instead of the base estimator.
+
+## Leakage demonstration (AC-H-09, DQ-08)
+
+The comparison figure needs smoothed probabilities `P(S_t | x_1:T)`. They are computed by a forward–backward pass only in `regport.report.figures.smoothed_for_illustration`, with the final refit's parameters. They never feed a strategy.

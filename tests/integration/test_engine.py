@@ -150,7 +150,7 @@ def test_failed_runs_are_logged(
     tmp_path: Path, universe_file: Path, panel: Panel, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     cfg = make_cfg(tmp_path, universe_file, regime__usage="hmm")
-    with pytest.raises(BacktestError, match="M5"):
+    with pytest.raises(ValueError, match="auto"):
         run_backtest(cfg, panel=panel)
 
     def broken(*_a: Any, **_k: Any) -> np.ndarray:

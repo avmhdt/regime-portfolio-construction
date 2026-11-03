@@ -2,7 +2,7 @@
 
 > Detect market regimes in real time and compare allocation methods honestly against the 1/N benchmark.
 
-**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; the research memo replaces this README at M7.
+**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; M5 (regime layer, preregistration) is done; the research memo replaces this README at M7.
 
 | | |
 |---|---|
@@ -15,7 +15,7 @@
 ## Requirements
 
 - [x] A multi-asset universe of 10–20 liquid ETFs or futures proxies across equities, rates, credit, commodities and FX. (FR-01, FR-07; AC-W-05 with SPY's 1998 start as a documented exception)
-- [ ] Regime models using filtered (real-time) probabilities only: Gaussian HMM and Bayesian online change-point detection.
+- [x] Regime models using filtered (real-time) probabilities only: Gaussian HMM and Bayesian online change-point detection. (FR-11 to FR-16; [reports/regimes.md](reports/regimes.md))
 - [x] Covariance estimators (sample, EWMA, Ledoit–Wolf, OAS) evaluated on out-of-sample risk forecasts. (FR-09, FR-10; [reports/cov_eval.md](reports/cov_eval.md))
 - [x] Optimizers: minimum variance, equal risk contribution, HRP (López de Prado 2016), and constrained mean–variance with a turnover penalty. (FR-17 to FR-20, AC-W-08)
 - [x] A 1/N benchmark (DeMiguel, Garlappi and Uppal 2009) and cost-aware rebalancing. (FR-21 to FR-24, AC-W-10)
@@ -41,7 +41,7 @@ Raw and licensed data live in `data/`, which is git-ignored. Only download scrip
 
 ### Works (correct and reproducible)
 
-- [ ] A unit test shows regime probabilities at time t never use data after t (no smoothed-state leakage).
+- [x] A unit test shows regime probabilities at time t never use data after t (no smoothed-state leakage). (AC-W-01: tests/unit/test_no_lookahead.py)
 - [x] ERC portfolios have equal risk contributions within 1e-6, and constraints always hold. (AC-W-02: property tests and a check at every rebalance; drift within D-06's 2-point band is reported, see docs/decisions.md)
 - [x] The ex-ante vs ex-post volatility bias statistic is close to 1 for your chosen estimator. (AC-W-03, EWMA chosen by D-12; [reports/cov_eval.md](reports/cov_eval.md))
 

@@ -1,0 +1,90 @@
+# Preregistration (AC-H-10)
+
+Committed on 2026-11-03, before any real-data backtest and before the first `regport grid` row in `results/trial_log.csv`. Later changes are appended under "Deviations" with a date and a reason; nothing above that heading is rewritten.
+
+## Question
+
+Does a regime layer built from strictly filtered probabilities improve out-of-sample, after-cost, risk-adjusted returns? Compared against the same optimizer without it, and against 1/N?
+
+## Headline configuration (`configs/base.yaml`)
+
+| Item | Choice | Source |
+|---|---|---|
+| Optimizer | Equal risk contribution | Spec default |
+| Regime usage | `hmm`: mixture covariance with forward state weights over 21 days, regime covariances shrunk 50% toward their diagonal (FR-16) | Spec default |
+| HMM | Gaussian, K = 4, full covariance. Features set A: SPY daily log return and daily change of BAA10Y. Before 1998-01-02, the Kenneth French daily market return stands in for SPY, as a model input only. Refit every 21 trading days on an expanding window of at least 2,520 days, 10 seeded restarts | K by BIC on 1993-02-02 to 2004-12-31 (rule fixed in `docs/decisions.md`). The proxy is an owner ruling |
+| Covariance estimator | EWMA, half-life 63 days, 504-day window | D-12, chosen on 2005–2014 windows (`reports/cov_eval.md`) |
+| BOCPD | Hazard 1/100, Normal–Gamma prior μ0 = 0, κ0 = 1, α0 = 2, β0 = 1.189e-4. Trigger P(run length < 21) > 0.5 switches to an EWMA with half-life 10 days | Highest pre-2005 predictive log-likelihood (rule fixed in `docs/decisions.md`) |
+| Universe and entry | The 12 ETFs; staggered entry after 252 valid returns (D-02) | Spec default |
+| Rebalancing | Monthly decisions on the last trading day, trading only if a weight is more than 2 points from target; execution at the next close (D-06, DQ-06) | Spec default |
+| Constraints | Long-only, fully invested. Cap 0.40 for min-variance and mean–variance (D-07) | Spec default |
+| Costs | One-way per-asset table, 1–5 bps (`configs/universe.yaml`, D-04) | Spec default |
+| Sample | OOS from 2005-01-03 to the last complete month at the final run (D-13) | Spec default |
+| Benchmark | 1/N over eligible assets, through the same eligibility, schedule, threshold, lag and costs | FR-21 |
+
+## Tests
+
+- **Primary:** the Ledoit–Wolf (2008) Sharpe-difference test on daily excess returns, net of costs, of the headline against 1/N. It uses a studentized circular block bootstrap (5,000 resamples, block size calibrated over {1, 2, 4, 6, 8, 10}), two-sided, 5% level. The HAC version (Parzen kernel, VAR(1) prewhitening) is reported alongside (D-08).
+- **Multiple testing:** Holm across every strategy compared with 1/N in the ablation grid.
+- **Ablation:** each regime arm against the same optimizer with `none`, using the paired Ledoit–Wolf test, and reporting the differences in net Sharpe, CEQ, turnover, cost drag and max drawdown.
+
+## Ablation grid (`configs/ablation.yaml`, M6)
+
+- **Optimizers:** min_variance, erc, hrp, mv_turnover.
+- **Regime modes:** none, hmm with feature set A, hmm with feature set B (ALFRED point in time), and bocpd.
+- **Benchmark:** 1/N.
+- **Size:** 4 × 4 + 1 = 17 configurations, each logged as a trial.
+
+## Robustness (M6, in this order)
+
+1. Uniform cost grid of 0, 5, 10 and 25 bps, with the break-even cost against 1/N.
+2. Common-start panel (D-02 a).
+3. Kenneth French 10 and 49 industries.
+4. ALFRED point-in-time vs latest-revised macro features (feature set B, AC-H-07).
+5. AQR factor premia (aggregate results only, AQR cited).
+
+## Fixed and never tuned
+
+- The stress windows: 2007-10-09 to 2009-03-09, 2020-02-19 to 2020-03-23, and 2022-01-03 to 2022-10-12.
+- All regime hyperparameters above. They were chosen on pre-2005 data only.
+
+## Known open items at registration
+
+- **BOCPD validation (3b).** At hazard 1/100, BOCPD raises about 6 false alarms per 1,000 stationary synthetic days, against the spec's at most 1. Detection (3a) passes. The owner rules on this before M5 merges. If the hazard changes, that is appended below as a deviation.
+- **Proxy disclosure.** The regime model's pre-1998 history uses the French market proxy. The research memo says so.
+
+## Deviations
+
+### 2026-11-03: BOCPD hazard reselected under the validation constraint (owner ruling)
+
+- **The original result, kept on record.** The rule fixed beforehand picked hazard 1/100 with α0 = 2, the highest pre-2005 predictive log-likelihood. At that setting, validation item (3b) failed: about 6.8 false alarms per 1,000 stationary synthetic days, against at most 1. Detection (3a) passed.
+- **The owner's ruling.** Reselect on pre-2005 and synthetic data only, restricted to settings that pass both checks. The rule below was fixed and committed before the reselection ran.
+  - **Grid:** unchanged, hazard λ ∈ {100, 250, 500, 1000} × α0 ∈ {2, 5, 10, 20}, with `β0 = (α0 − 1) s²`, where `s` is the standard deviation of the pre-2005 SPY (proxy) log return.
+  - **Synthetic checks:** run with base volatility σ = s, at 20 fixed-seed replications per setting.
+  - **(3a) detection:** six segments of 400 days that alternate σ and 3σ, so five shifts. A replication passes if at least 4 of the 5 shifts are flagged (`P(r < 21) > 0.5`) within 10 observations. The setting passes if at least 18 of 20 replications pass.
+  - **(3b) false alarms:** 10,000 stationary days at σ. Count onsets (crossings above 0.5) after a 100-day burn-in. The setting passes if the mean over the 20 replications is at most 1.0 per 1,000 days.
+  - **Choice:** among the settings that pass both, the highest pre-2005 predictive log-likelihood. If none passes, nothing changes and the owner is told.
+  - **Also reported:** detection under the literal "variance ×3" reading (σ and √3σ).
+- **Result (run 2026-11-03, 20 replications per setting, σ = s = 0.0109):** hazard **1/500** with α0 = 2 and β0 = 1.189e-4. It is the passing setting with the highest pre-2005 predictive log-likelihood. `configs/base.yaml` now uses it for every run. The headline table above keeps the original 1/100, as written at registration.
+
+| Hazard | α0 | (3a) reps with ≥ 4 of 5 (std dev ×3) | (3a) under the variance reading | (3b) false alarms per 1,000 | Passes | Pre-2005 predictive log-lik. |
+|---|---|---|---|---|---|---|
+| 1/100 | 2 | 20 | 4 | 6.36 | no | 9,781.00 |
+| 1/100 | 5 | 20 | 2 | 5.13 | no | 9,764.32 |
+| 1/100 | 10 | 20 | 2 | 5.04 | no | 9,742.97 |
+| 1/100 | 20 | 20 | 2 | 4.87 | no | 9,709.05 |
+| 1/250 | 2 | 19 | 1 | 1.75 | no | 9,776.30 |
+| 1/250 | 5 | 19 | 1 | 1.36 | no | 9,763.07 |
+| 1/250 | 10 | 19 | 1 | 1.35 | no | 9,744.02 |
+| 1/250 | 20 | 18 | 1 | 1.33 | no | 9,712.40 |
+| **1/500** | **2** | **19** | **1** | **0.67** | **yes** | **9,768.48** |
+| 1/500 | 5 | 19 | 1 | 0.56 | yes | 9,757.96 |
+| 1/500 | 10 | 19 | 1 | 0.56 | yes | 9,740.02 |
+| 1/500 | 20 | 15 | 0 | 0.53 | no | 9,710.30 |
+| 1/1000 | 2 | 18 | 0 | 0.30 | yes | 9,760.31 |
+| 1/1000 | 5 | 19 | 0 | 0.23 | yes | 9,751.76 |
+| 1/1000 | 10 | 18 | 0 | 0.21 | yes | 9,734.80 |
+| 1/1000 | 20 | 14 | 0 | 0.20 | no | 9,706.80 |
+
+- **Under the literal "variance ×3" reading,** detection fails for every setting (at most 4 of 20 replications). The standard-deviation reading was chosen after these results were seen, and that is disclosed here and in `docs/decisions.md` (owner ruling: use the standard deviation for selection, report both).
+- **When:** committed before any real-data backtest or grid row.

@@ -35,8 +35,16 @@ from regport.opt.erc import ERCError, erc, risk_contributions
 from regport.opt.hrp import hrp
 from regport.opt.minvar import SolverError, min_variance
 from regport.opt.mv_tc import james_stein_mean, mean_variance_tc
-from regport.risk.covariance import ANNUALIZATION, Estimator, trailing_window, wide_returns
+from regport.regime.runner import RegimeOutputs, load_or_run
+from regport.risk.covariance import (
+    ANNUALIZATION,
+    Estimator,
+    ewma_cov,
+    trailing_window,
+    wide_returns,
+)
 from regport.risk.evaluation import resolve_oos_end
+from regport.risk.regime_cov import forward_weights, regime_mixture_cov
 from regport.settings import Settings
 from regport.tracking.experiment_log import TrialRow, log_failed, log_trial
 
@@ -106,11 +114,59 @@ class _Decision:
     rc_gap: float | None
 
 
+class _RegimeView:
+    """Regime inputs as known at each decision date (filtered or predicted only, DQ-08)."""
+
+    def __init__(self, outputs: RegimeOutputs, n_states: int) -> None:
+        self.p: dict[date, np.ndarray] = {}
+        self.refit: dict[date, int] = {}
+        self.transmats = outputs.transmats or {}
+        if outputs.hmm is not None:
+            wide = outputs.hmm.sort("date", "state")
+            dates = wide["date"].unique(maintain_order=True).to_list()
+            probs = wide["p_filtered"].to_numpy().reshape(len(dates), n_states)
+            refits = wide["refit_id"].to_numpy().reshape(len(dates), n_states)[:, 0]
+            fit_end = wide["params_fit_end"].to_list()[::n_states]
+            for d, row, rid, fe in zip(dates, probs, refits, fit_end, strict=True):
+                if fe > d:
+                    raise BacktestError(f"regime row at {d} uses a fit ending {fe}")
+                self.p[d] = row
+                self.refit[d] = int(rid)
+        self.cp: dict[date, float] = {}
+        if outputs.bocpd is not None:
+            self.cp = dict(outputs.bocpd.select("date", "cp_prob_short").iter_rows())
+
+
 class _Strategy:
-    def __init__(self, cfg: ExperimentConfig, costs: CostModel) -> None:
+    def __init__(
+        self, cfg: ExperimentConfig, costs: CostModel, regime: _RegimeView | None = None
+    ) -> None:
         self.cfg = cfg
         self.costs = costs
         self.estimator = Estimator(cfg.risk.estimator, cfg.risk.ewma_half_life_days)
+        self.regime = regime
+        self.events = {"bocpd_triggers": 0, "hmm_mixtures": 0, "hmm_unavailable": 0}
+
+    def _risk_inputs(self, returns: F64, dates: list[date], asof: date) -> tuple[F64, F64 | None]:
+        """Covariance (annualized) and, for the hmm modes, the mixture mean (FR-16)."""
+        rc = self.cfg.regime
+        usage = rc.usage
+        view = self.regime
+        triggered = view is not None and view.cp.get(asof, 0.0) > rc.bocpd.trigger_prob
+        if usage in ("bocpd", "hmm_bocpd") and triggered:
+            self.events["bocpd_triggers"] += 1
+            return ewma_cov(returns, rc.bocpd.fast_ewma_half_life_days), None
+        if usage in ("hmm", "hmm_bocpd") and view is not None:
+            keep = [i for i, d in enumerate(dates) if d in view.p]
+            if asof in view.p and len(keep) >= 2 * returns.shape[1]:
+                probs = np.vstack([view.p[dates[i]] for i in keep])
+                pi = forward_weights(
+                    view.p[asof], view.transmats[view.refit[asof]], rc.horizon_days
+                )
+                self.events["hmm_mixtures"] += 1
+                return regime_mixture_cov(returns[keep], probs, pi, rc.hmm.state_cov_shrinkage)
+            self.events["hmm_unavailable"] += 1
+        return self.estimator.estimate(returns, asof), None
 
     def decide(self, panel: Panel, i: int, w_drift: F64) -> _Decision:
         cfg, name = self.cfg, self.cfg.optimizer.name
@@ -135,7 +191,7 @@ class _Strategy:
         cols = np.array([panel.symbols.index(s) for s in win.symbols], dtype=np.int64)
         if cols.size == 0:
             return self._full(cols, np.zeros(0), n_all, [], False, None)
-        cov = self.estimator.estimate(win.returns, asof)
+        cov, regime_mu = self._risk_inputs(win.returns, win.dates, asof)
         prev = w_drift[cols]
         fallback, rc_gap = False, None
         try:
@@ -147,8 +203,11 @@ class _Strategy:
             elif name == "hrp":
                 w = hrp(cov, cfg.optimizer.hrp.linkage)
             else:
-                mean_rows = win.returns[-cfg.optimizer.mv.mean_window_days :]
-                mu = james_stein_mean(mean_rows, cov / ANNUALIZATION)
+                if regime_mu is not None:  # FR-16: shrunk 50% toward the cross-sectional mean
+                    mu = 0.5 * regime_mu + 0.5 * float(regime_mu.mean())
+                else:
+                    mean_rows = win.returns[-cfg.optimizer.mv.mean_window_days :]
+                    mu = james_stein_mean(mean_rows, cov / ANNUALIZATION)
                 kappa = (
                     self.costs.rates(win.symbols)
                     * cfg.optimizer.mv.turnover_penalty_mult
@@ -181,12 +240,21 @@ class _Strategy:
 
 
 def simulate(
-    cfg: ExperimentConfig, panel: Panel, universe: Universe
+    cfg: ExperimentConfig,
+    panel: Panel,
+    universe: Universe,
+    regime: RegimeOutputs | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, Any]]:
     """Run the daily loop; returns the returns frame, the trade frame and run diagnostics."""
     costs = _cost_model(cfg, universe)
     rates = costs.rates(panel.symbols)
-    strategy = _Strategy(cfg, costs)
+    view = None
+    if cfg.regime.usage != "none":
+        if regime is None:
+            raise BacktestError("regime usage needs regime outputs")
+        k = cfg.regime.hmm.n_states
+        view = _RegimeView(regime, int(k) if k != "auto" else 1)
+    strategy = _Strategy(cfg, costs, view)
     oos_end = resolve_oos_end(panel.dates, cfg.sample.oos_end)
     start = next(i for i, d in enumerate(panel.dates) if d >= cfg.sample.oos_start)
     end = panel.dates.index(oos_end)
@@ -267,6 +335,7 @@ def simulate(
         "held_asset_missing_returns": missing_held,
         "erc_max_rc_gap": max(rc_gaps) if rc_gaps else None,
         "rf_missing_days": int(np.isnan(rf).sum()),
+        **strategy.events,
     }
     trade_frame = pl.DataFrame(
         trades,
@@ -287,6 +356,7 @@ def run_backtest(
     settings: Settings | None = None,
     panel: Panel | None = None,
     tag: str = "",
+    regime: RegimeOutputs | None = None,
 ) -> BacktestResult:
     """One backtest; always appends exactly one trial-log row, even if it fails (FR-25)."""
     log_path = Path(cfg.logging.experiment_log)
@@ -294,14 +364,21 @@ def run_backtest(
     params = {**cfg.to_params(), "tag": tag, "config_hash": cfg.config_hash()}
     started = time.perf_counter()
     try:
-        if cfg.regime.usage != "none":
-            raise BacktestError(f"regime usage {cfg.regime.usage!r} arrives in M5")
         universe = load_universe(cfg.data.universe_file)
+        settings = settings or Settings()
         if panel is None:
-            settings = settings or Settings()
             panel = Panel.load(settings.data_dir / "processed")
-        frame, trades, diag = simulate(cfg, panel, universe)
-    except (BacktestError, ConstraintViolation, ValueError, KeyError) as exc:
+        if cfg.regime.usage != "none" and regime is None:
+            models = {"hmm": ("hmm",), "bocpd": ("bocpd",)}.get(cfg.regime.usage, ("hmm", "bocpd"))
+            regime = load_or_run(
+                cfg,
+                settings.data_dir / "processed",
+                settings.results_dir,
+                settings.regport_n_jobs,
+                models,
+            )
+        frame, trades, diag = simulate(cfg, panel, universe, regime)
+    except (BacktestError, ConstraintViolation, ValueError, KeyError, OSError) as exc:
         row = log_failed(family, params, f"failed: {type(exc).__name__}: {exc}", path=log_path)
         log.error("backtest_failed", run_id=row.run_id, error=str(exc))
         raise
