@@ -40,3 +40,14 @@ Thumbs.db
 
 # Local build spec (kept out of the public repo)
 SPEC.html
+
+# Run outputs (spec §6); results/trial_log.csv stays committed
+results/runs/
+results/regime/
+results/cov_eval/
+results/logs/
+results/cache/
+.coverage
+coverage.xml
+.hypothesis/
+.benchmarks/

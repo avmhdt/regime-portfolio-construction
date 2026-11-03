@@ -2,7 +2,7 @@
 
 > Detect market regimes in real time and compare allocation methods honestly against the 1/N benchmark.
 
-**Status:** planning
+**Status:** in progress. M1 (scaffolding, CI, data-access smoke test) is done; the research memo replaces this README at M7.
 
 | | |
 |---|---|
@@ -44,6 +44,17 @@ Raw and licensed data live in `data/`, which is git-ignored. Only download scrip
 - [ ] An out-of-sample comparison against 1/N with a proper Sharpe-difference test (Ledoit and Wolf 2008), reported honestly even if 1/N wins.
 - [ ] An ablation showing what the regime layer adds over the optimizer alone, net of turnover.
 - [ ] Stress tests through 2008, 2020 and 2022 with drawdown and recovery statistics.
+
+## Development
+
+```bash
+uv sync
+cp .env.example .env   # then add FRED_API_KEY and SHARADAR_API_KEY
+uv run regport smoke
+uv run pytest
+```
+
+Decisions and their reasons are in [docs/decisions.md](docs/decisions.md). Every backtest appends one row to `results/trial_log.csv` in [trial-log contract v1.0](https://github.com/avmhdt/backtest-overfitting-lab/blob/main/docs/trial-log.md).
 
 ## Questions this project must answer
 

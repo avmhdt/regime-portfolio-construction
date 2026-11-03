@@ -1,0 +1,36 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=5120]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy (src only)
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        files: ^src/
+        types: [python]
+      - id: banned-hmmlearn-calls
+        name: reject hmmlearn predict/predict_proba/decode/score_samples in src (FR-15)
+        entry: uv run python -m regport.regime.guard
+        language: system
+        files: ^src/.*\.py$
+      - id: no-data-files
+        name: reject data, secrets and files over 5 MB
+        entry: uv run python scripts/check_tracked_files.py
+        language: system
