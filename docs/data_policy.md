@@ -19,8 +19,9 @@ Raw files live under `data/raw/<source>/` with a UTC stamp in the name. `data/ra
 
 ## Coverage
 
-- **Sharadar SFP starts on 1997-12-31 for SPY.** The other 11 ETFs start within 10 trading days of their inception (AC-W-05). The master calendar is SPY's Sharadar trading dates, so the panel starts on 1997-12-31, not at the spec's `data_start` of 1993-02-01.
+- **Sharadar SFP starts on 1997-12-31 for SPY.** That fails AC-W-05 for SPY alone, and the owner ruled it a documented exception on 2026-11-03. The other 11 ETFs start within 10 trading days of their inception (AC-W-05). The master calendar is SPY's Sharadar trading dates, so the panel starts on 1997-12-31, not at the spec's `data_start` of 1993-02-01.
 - **Stooq starts on 2005-02-25 for SPY** and on or near inception for the later ETFs. It can't cover any pre-2005 window.
+- **Regime features before 1998 (owner ruling, 2026-11-03):** Ken French's daily market return (Mkt-RF + RF) stands in for SPY's return as an HMM and BOCPD input only, and is labelled as a proxy wherever it is used. Investable returns are never proxied (D-02).
 
 ## Pre-inception policy (D-02, staggered entry)
 
@@ -48,7 +49,13 @@ On the built panel:
 
 - **Sharadar includes distributions.** Over 2010-01-01 to 2024-12-31, the annualized return from `closeadj` exceeds the price-only return from the split-adjusted `close` by 5.9%/yr for HYG and 3.7%/yr for LQD. The threshold is 2.0%/yr.
 - **Stooq is only partly adjusted.** Its HYG series returns 3.0%/yr over the same window: above the 2.0%/yr floor, but about 2 points a year below Sharadar's.
-- **The two sources disagree by more than 5 bps on 2–4% of days for most ETFs**, against the spec's 99% agreement rule. Of the 1,318 disagreement days, 622 are distribution days on which Stooq's "adjusted" return equals the price-only return, meaning Stooq missed the distribution. This accounts for most of the bond ETFs' disagreements (HYG 111 of 148, LQD 134 of 193, IEF 125 of 172). The rest are close-price differences of a few bps, concentrated in 2011–2016. The per-symbol table is in the data-quality report. This failure is pending an owner ruling: see `docs/decisions.md`.
+- **Sharadar and Stooq agree within 5 bps on 97.95% of common days**, against the spec's 99% rule. On 2026-11-03 the owner ruled this a documented exception, with the threshold unchanged.
+  - 678 of the 1,318 disagreement days are distribution days on which Stooq's "adjusted" return is much closer to the price-only return, so it looks unadjusted.
+  - The non-distribution disagreements fall on no split days and span no missing days. They cluster in 2006–2008 and 2011–2016.
+  - 250 of them reverse the next day, which means a one-day difference in closing levels. 301 have no identified pattern.
+  - Their cause is not established.
+  - With distribution days excluded, agreement is 99.07% overall.
+  - The categorized table is in the data-quality report.
 
 ## Determinism (DQ-12)
 

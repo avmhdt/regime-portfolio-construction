@@ -76,21 +76,40 @@ D-02 to D-14 stand as written in the spec:
 | M1 | Trial log append-only check | CI compares `results/trial_log.csv` on the PR with the base branch and fails unless the base version is a byte prefix | AC-W-09: no row ever edited or deleted |
 | M1 | Stooq coverage | The snapshot's SPY file starts on 2005-02-25, not 1993 | Found by `regport smoke`. The Stooq fallback therefore cannot supply the 1993-2004 pre-OOS window that D-05 uses to pick K; Sharadar SFP is needed for that, and M2 records each source's first date per symbol |
 | M1 | Smoke test, 2026-11-03 | `regport smoke` passed: DTB3 19,000 rows 1954-01-04 to 2026-10-30; UNRATE 2,199 rows in 800 vintages; SPY from Sharadar SFP, 7,254 rows 1997-12-31 to 2026-11-02. Output, raw files, manifest and source tree scanned for both key values: none found | M1 exit criterion |
-| M2 | Sharadar SFP coverage | SFP starts on 1997-12-31 for SPY; the other 11 ETFs start within 10 trading days of inception. The panel and master calendar therefore start on 1997-12-31 | Pending owner ruling on AC-W-05 for SPY and on the pre-2005 HMM window (D-05, FR-11): see "Open questions" |
-| M2 | Stooq adjustment | Stooq misses about half of HYG's distributions, and disagrees with Sharadar by more than 5 bps on 2-4% of days for most ETFs | DQ-03's 99% agreement rule fails; pending owner ruling |
+| M2 | Sharadar SFP coverage | SFP starts on 1997-12-31 for SPY; the other 11 ETFs start within 10 trading days of inception. The panel and master calendar therefore start on 1997-12-31 | Ruled 2026-11-03: see "Owner rulings on M2" |
+| M2 | Stooq adjustment | Stooq misses about half of HYG's distributions, and disagrees with Sharadar by more than 5 bps on 2-4% of days for most ETFs | DQ-03's 99% agreement rule fails; ruled a documented exception on 2026-11-03 |
 | M2 | `close` columns | `prices_daily.close` is Sharadar's `closeunadj` (the schema's "unadjusted"); an extra column `close_splitadj` keeps Sharadar's split-adjusted `close`, used as the price-only series in DQ-03 and for split detection | Unadjusted closes jump at splits (EFA and EEM 2005-06-09, EEM 2008-07-24), so they can't serve as a price-only return series |
 | M2 | `pit_approx` | `macro_pit` carries `pit_approx` as an extra column, so `value_asof` and the table agree; `macro_vintages.pit_approx` marks rows of each series' earliest vintage, the only rows a DQ-10 approximation can use | The schema lists `pit_approx` only on `macro_vintages` |
 | M2 | ALFRED business day | `asof - 1 business day` means one weekday back (`numpy.busday_offset`), not one trading day | A release on an exchange holiday (the jobs report on Good Friday) is public on the next weekday |
 | M2 | Download cap | File downloads stream at no more than 8 MB/s, below the owner's 10 MB/s cap for this PC | Live recorders share the connection |
 | M2 | AQR parser | Deferred to M6 | FR-06 is Could and listed under M6. Aggregate AQR results may be published there, with AQR cited (owner ruling after AQR's permission) |
 | M2 | French range check | DQ-11 fails on returns below -100% (impossible); returns above +100% are counted, not failed | Two 1930s days in the 49-industry file (Paper, MedEq) exceed +100%, which is real for thin early portfolios |
+| M2 | Raw file names | Every raw file name carries a UTC stamp and, if that path is taken, a `-1`, `-2` suffix (`fresh_path`). A re-converted Stooq file once reused its name and overwrote the raw file it replaced; the integration test caught it through DQ-12 | DQ-12: raw files are immutable, and re-fetches add files |
+| M2 | Documented exceptions in code | `regport.data.checks.OWNER_EXCEPTIONS` names the two ruled exceptions. A check that fails within a ruled exception still reports FAIL, marked "documented exception", and doesn't block the exit code; any other failure blocks | Thresholds stay as the spec has them |
 
-## Open questions for the owner
+## Owner rulings on M2 (2026-11-03)
 
-1. **AC-W-05 for SPY.** Sharadar SFP starts on 1997-12-31, five years after SPY's 1993 inception, so the literal criterion fails for SPY alone. Proposed: accept SFP's 1998 start as SPY's coverage start, as a documented exception. This matches `DECISIONS.md`'s "history starts in 1998".
-2. **Pre-2005 regime window.** The spec chooses K by BIC on 1993-02 to 2004-12 (D-05) and needs at least 2,520 training days before the first HMM fit (FR-11). From 1998 there are about 1,760 days before 2005-01-03. Options:
-   - (a) Keep 2,520: the first HMM probabilities arrive around 2008-01, and the regime arms equal "none" before that.
-   - (b) Before 1998, use the Kenneth French daily market return (Mkt-RF + RF) as the SPY return feature for the HMM and BOCPD only, never as an investable return.
-   - (c) Lower `min_train_days` to about 1,750.
-   - Recommended: (b), because it keeps the spec's 1993 window and thresholds.
-3. **DQ-03 agreement.** The spec requires Sharadar and Stooq to agree within 5 bps on at least 99% of days, but Stooq misses distributions. Proposed: keep the threshold, report the failure with its diagnosis as a documented exception, and keep Sharadar as the price source. Sharadar's own adjustment test passes.
+Answered in the main session and relayed by the 15-projects review session.
+
+1. **AC-W-05 for SPY: accepted as a documented exception.**
+   - Sharadar SFP starts SPY on 1997-12-31, five years after its 1993 inception. The other 11 ETFs start within 10 trading days of inception.
+   - `regport data check` still reports AC-W-05 as a failure for SPY, with the exception noted. The exception covers SPY only: any other symbol failing still blocks.
+2. **Pre-2005 regime window: "French market pre-1998" (option b).**
+   - Before 1998-01-02, Ken French's daily market return (Mkt-RF + RF, `ff3_daily`) stands in for SPY's return. It is an input to the HMM and BOCPD only, never an investable return.
+   - The spec's window and thresholds are unchanged: K by BIC on 1993-02 to 2004-12 (D-05), and `min_train_days` 2,520 (FR-11).
+   - The proxy is labelled wherever it applies: the feature column, the regime outputs and the reports. The research memo will say that the regime model's early history uses a proxy.
+   - It is built in M5.
+3. **DQ-03 source agreement: "Accept, explain the rest", a documented exception.**
+   - The 99% threshold is unchanged, and Sharadar stays the price source. Sharadar's own adjustment tests pass.
+   - `regport data check` puts every disagreement day in one category, first match wins. The categories describe the days; none says which source is wrong. Totals over 2005-02-28 to 2026-10-30, for 1,318 disagreeing days out of 64,156 common days:
+     - 678: distribution days where Stooq's return is much closer to the price-only return than to the total return, so it looks unadjusted.
+     - 58: other distribution days.
+     - 28: the first trading day after a market holiday.
+     - 250: the gap reverses the next day, so the two closing levels differ for that one day.
+     - 3: one source shows a zero return.
+     - 301: none of the above (unexplained).
+   - None of the non-distribution disagreements falls on a split day or spans a missing day.
+   - They cluster in 2006–2008 (261) and 2011–2016 (255). By asset, they are concentrated in TLT, DBC and SPY.
+   - **Cause not established.** For the 250 one-day differences and the 301 unexplained days, the evidence doesn't show which source is off or why. Settling it would need a third source.
+   - **Distribution days excluded,** the sources agree on 99.07% of days overall. Per asset, everything is at or above 99% except TLT (97.52%), DBC (98.35%) and SPY (98.77%).
+   - The full table is in `reports/data_quality.md`.

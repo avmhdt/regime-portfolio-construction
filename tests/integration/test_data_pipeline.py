@@ -354,15 +354,26 @@ def test_check_fails_when_stooq_misses_distributions(mocked: dict[str, Path]) ->
     if not (settings.data_dir / "processed" / "prices_daily.parquet").exists():
         CliRunner().invoke(app, ["fetch", "all", "--config", str(mocked["config"])])
         CliRunner().invoke(app, ["data", "build", "--config", str(mocked["config"])])
-    _write_stooq(mocked["root"] / "stooq", price_only={"HYG"})
-    ingest.fetch_stooq(settings, universe, ["HYG"], force=True)
-    ingest.write_interim_prices(settings, "stooq", universe)
-    report = checks.run_checks(cfg, settings, universe)
+
+    def check_with_price_only(symbol: str) -> checks.CheckReport:
+        _write_stooq(mocked["root"] / "stooq", price_only={symbol})
+        ingest.fetch_stooq(settings, universe, [symbol], force=True)
+        ingest.write_interim_prices(settings, "stooq", universe)
+        return checks.run_checks(cfg, settings, universe)
+
+    # LQD: only the agreement rule fails, which is the owner-ruled documented exception.
+    report = check_with_price_only("LQD")
     dq03 = next(c for c in report.checks if c.id == "DQ-03")
-    assert dq03.passed is False and not report.ok
-    hyg = next(r for r in dq03.table if r.get("symbol") == "HYG")
-    assert hyg["of which distribution days Stooq left unadjusted"] == hyg["disagreeing days"]
-    assert len(Manifest(settings.data_dir).entries) == 32  # the old Stooq file is kept
+    assert dq03.passed is False and dq03.exception and report.ok
+    agreement = dq03.subtables[0][1]
+    lqd = next(r for r in agreement if r.get("symbol") == "LQD")
+    assert lqd["missed distribution"] == lqd["disagreeing days"] > 0
+    assert lqd["agree excl. distribution days, %"] == 100.0
+    # HYG: Stooq's own adjustment test fails too, and that still blocks.
+    report = check_with_price_only("HYG")
+    dq03 = next(c for c in report.checks if c.id == "DQ-03")
+    assert dq03.passed is False and not dq03.exception and not report.ok
+    assert len(Manifest(settings.data_dir).entries) == 33  # older Stooq files are kept
     _write_stooq(mocked["root"] / "stooq")
 
 
@@ -376,3 +387,13 @@ def test_missing_processed_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
             settings,
             load_universe(Path(__file__).resolve().parents[2] / "configs" / "universe.yaml"),
         )
+
+
+def test_exception_only_covers_ruled_failures() -> None:
+    blocking = checks.CheckResult("X", "x", False, "failed")
+    excepted = checks.CheckResult("X", "x", False, "failed", exception="ruled")
+    assert blocking.blocking and not excepted.blocking
+    assert excepted.status == "FAIL, documented exception" and "ruled" in excepted.line()
+    report = checks.CheckReport([excepted], "sharadar", (START, END))
+    assert report.ok
+    assert not checks.CheckReport([excepted, blocking], "sharadar", (START, END)).ok

@@ -228,3 +228,15 @@ def test_cli_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         )
         == "stooq"
     )  # type: ignore[call-arg]
+
+
+def test_fresh_path_never_overwrites(tmp_path: Path) -> None:
+    from regport.data.manifest import fresh_path
+
+    target = tmp_path / "SPY_20261103T000000Z.csv"
+    assert fresh_path(target) == target
+    target.write_text("a", encoding="utf-8")
+    second = fresh_path(target)
+    assert second.name == "SPY_20261103T000000Z-1.csv"
+    second.write_text("b", encoding="utf-8")
+    assert fresh_path(target).name == "SPY_20261103T000000Z-2.csv"

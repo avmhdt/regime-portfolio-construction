@@ -11,7 +11,7 @@ import math
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +38,22 @@ OUTLIER_ABS_RET = 0.25
 SPLIT_JUMP = 0.10
 PIT_SAMPLE = 50
 PAYEMS_MIN_SHARE = 0.5
+MISS_CATEGORIES = (
+    "missed distribution",
+    "other distribution",
+    "after holiday",
+    "reversed next day",
+    "one source unchanged",
+    "unexplained",
+)
+# Documented exceptions ruled by the owner on 2026-11-03 (docs/decisions.md). The check still
+# reports FAIL against its unchanged threshold; the exception only stops the failure blocking.
+OWNER_EXCEPTIONS = {
+    "AC-W-05": "SPY only: Sharadar SFP starts on 1997-12-31 (owner ruling 2026-11-03)",
+    "DQ-03": "source agreement below 99%; threshold unchanged, Sharadar stays the price source "
+    "(owner ruling 2026-11-03)",
+}
+AC_W_05_EXEMPT = frozenset({"SPY"})
 
 
 @dataclass
@@ -47,10 +63,22 @@ class CheckResult:
     passed: bool | None  # None = not applicable at the data layer
     summary: str
     table: list[dict[str, object]] = field(default_factory=list)
+    exception: str = ""  # an owner-ruled documented exception: the failure doesn't block
+    subtables: list[tuple[str, list[dict[str, object]]]] = field(default_factory=list)
+
+    @property
+    def blocking(self) -> bool:
+        return self.passed is False and not self.exception
+
+    @property
+    def status(self) -> str:
+        if self.passed is False and self.exception:
+            return "FAIL, documented exception"
+        return {True: "PASS", False: "FAIL", None: "N/A"}[self.passed]
 
     def line(self) -> str:
-        status = {True: "PASS", False: "FAIL", None: "N/A "}[self.passed]
-        return f"[{status}] {self.id:<8} {self.title}: {self.summary}"
+        text = f"[{self.status}] {self.id:<8} {self.title}: {self.summary}"
+        return f"{text} (exception: {self.exception})" if self.exception else text
 
 
 @dataclass
@@ -61,7 +89,7 @@ class CheckReport:
 
     @property
     def ok(self) -> bool:
-        return all(c.passed is not False for c in self.checks)
+        return not any(c.blocking for c in self.checks)
 
 
 def annualized(ret: np.ndarray) -> float:
@@ -151,7 +179,8 @@ def check_coverage(ctx: _Context) -> CheckResult:
         f"{len(rows)} symbols; first date within {INCEPTION_TOLERANCE_DAYS} trading days of "
         f"inception for {len(rows) - len(failed)}" + (f"; not for {failed}" if failed else "")
     )
-    return CheckResult("AC-W-05", "Coverage and inception", ok, summary, rows)
+    exception = OWNER_EXCEPTIONS["AC-W-05"] if failed and set(failed) <= AC_W_05_EXEMPT else ""
+    return CheckResult("AC-W-05", "Coverage and inception", ok, summary, rows, exception)
 
 
 def check_availability(ctx: _Context) -> CheckResult:
@@ -241,6 +270,7 @@ def check_adjustment(ctx: _Context) -> CheckResult:
             }
         )
     agree_rows: list[dict[str, object]] = []
+    year_rows: list[dict[str, object]] = []
     if ctx.stooq is not None:
         s = ctx.stooq.filter(pl.col("date").is_between(lo, hi) & (pl.col("symbol") == "HYG"))
         s = s.sort("date").with_columns(_pct_change(s, "adj_close").alias("r"))
@@ -255,65 +285,134 @@ def check_adjustment(ctx: _Context) -> CheckResult:
                 "pass": passed,
             }
         )
-        both = (
-            ctx.prices.select("date", "symbol", "adj_close", "close_splitadj")
-            .join(
-                ctx.stooq.select("date", "symbol", pl.col("adj_close").alias("s")),
-                on=["date", "symbol"],
-            )
-            .sort("symbol", "date")
-        )
-        both = both.with_columns(
-            _pct_change(both, "adj_close").alias("ra"),
-            _pct_change(both, "s").alias("rs"),
-            _pct_change(both, "close_splitadj").alias("rp"),
-        ).drop_nulls(["ra", "rs", "rp"])
-        both = both.with_columns(
-            ((pl.col("ra") - pl.col("rs")).abs() <= AGREE_BPS).alias("agree"),
-            ((pl.col("ra") - pl.col("rp")).abs() > DIV_DAY_GAP).alias("dist_day"),
-            ((pl.col("rs") - pl.col("rp")).abs() <= 1e-4).alias("stooq_price_only"),
-        )
-        for sym in ctx.universe.symbols:
-            d = both.filter(pl.col("symbol") == sym)
+        both = _agreement_frame(ctx)
+        for sym in [*ctx.universe.symbols, "all"]:
+            d = both if sym == "all" else both.filter(pl.col("symbol") == sym)
             if d.is_empty():
                 continue
             share = float(d["agree"].mean())  # type: ignore[arg-type]
+            no_dist = d.filter(~pl.col("dist_day"))
+            share_nd = float(no_dist["agree"].mean()) if no_dist.height else float("nan")  # type: ignore[arg-type]
             bad = d.filter(~pl.col("agree"))
-            missed = bad.filter(pl.col("dist_day") & pl.col("stooq_price_only")).height
-            passed = share >= AGREE_MIN_SHARE
-            ok &= passed
-            agree_rows.append(
-                {
-                    "symbol": sym,
-                    "common days": d.height,
-                    "agree within 5 bps, %": round(100 * share, 2),
-                    "disagreeing days": bad.height,
-                    "of which distribution days Stooq left unadjusted": missed,
-                    "pass": passed,
-                }
-            )
-        pooled = float(both["agree"].mean())  # type: ignore[arg-type]
-        agree_rows.append(
+            row: dict[str, object] = {
+                "symbol": sym,
+                "common days": d.height,
+                "agree within 5 bps, %": round(100 * share, 2),
+                "agree excl. distribution days, %": round(100 * share_nd, 2),
+                "disagreeing days": bad.height,
+            }
+            for category in MISS_CATEGORIES:
+                row[category] = bad.filter(pl.col("category") == category).height
+            row["pass"] = share >= AGREE_MIN_SHARE
+            agree_rows.append(row)
+        misses = both.filter(~pl.col("agree") & ~pl.col("dist_day"))
+        year_rows = [
+            {"year": y, "non-distribution disagreeing days": n}
+            for y, n in misses.group_by(pl.col("date").dt.year().alias("year"), maintain_order=True)
+            .len()
+            .sort("year")
+            .iter_rows()
+        ]
+        year_rows.append(
             {
-                "symbol": "all",
-                "common days": both.height,
-                "agree within 5 bps, %": round(100 * pooled, 2),
-                "disagreeing days": both.filter(~pl.col("agree")).height,
-                "of which distribution days Stooq left unadjusted": both.filter(
-                    ~pl.col("agree") & pl.col("dist_day") & pl.col("stooq_price_only")
-                ).height,
-                "pass": pooled >= AGREE_MIN_SHARE,
+                "year": "on split days",
+                "non-distribution disagreeing days": misses.filter(pl.col("split_day")).height,
+            }
+        )
+        year_rows.append(
+            {
+                "year": "across a missing day",
+                "non-distribution disagreeing days": misses.filter(pl.col("gap") > 1).height,
             }
         )
     failed = [str(r["symbol"]) for r in agree_rows if not r["pass"]]
-    summary = "adjustment tests " + ("pass" if all(r["pass"] for r in rows) else "FAIL")
+    summary = "adjustment tests " + ("pass" if ok else "FAIL")
     if agree_rows:
         summary += (
             f"; {ctx.source} vs stooq agreement >= 99% for "
             f"{len(agree_rows) - len(failed)} of {len(agree_rows)} rows"
             + (f", not for {', '.join(failed)}" if failed else "")
         )
-    return CheckResult("DQ-03", "Adjustment and source agreement", ok, summary, rows + agree_rows)
+    exception = OWNER_EXCEPTIONS["DQ-03"] if ok and failed else ""
+    return CheckResult(
+        "DQ-03",
+        "Adjustment and source agreement",
+        ok and not failed,
+        summary,
+        rows,
+        exception,
+        [
+            ("Source agreement by symbol (Sharadar vs Stooq, 5 bps)", agree_rows),
+            ("Non-distribution disagreements by year", year_rows),
+        ],
+    )
+
+
+def _agreement_frame(ctx: _Context) -> pl.DataFrame:
+    """Daily returns of both sources on their common dates, each disagreement in one category.
+
+    Categories, first match wins. They describe the days; none says which source is wrong.
+    ``missed distribution``: a distribution day on which Stooq's return is much closer to the
+    price-only return than to the total return. ``other distribution``: any other distribution
+    day. ``after holiday``: the previous trading date is not the previous weekday. ``reversed
+    next day``: the difference changes sign the next day and mostly cancels, i.e. the two closing
+    levels differ for one day. ``one source unchanged``: one source shows a zero return.
+    ``unexplained``: the rest.
+    """
+    assert ctx.stooq is not None
+    index = {d: i for i, d in enumerate(ctx.calendar)}
+    both = (
+        ctx.prices.select("date", "symbol", "adj_close", "close_splitadj", "close")
+        .join(
+            ctx.stooq.select("date", "symbol", pl.col("adj_close").alias("s")),
+            on=["date", "symbol"],
+        )
+        .sort("symbol", "date")
+    )
+    factor = pl.col("close") / pl.col("close_splitadj")
+    both = both.with_columns(
+        _pct_change(both, "adj_close").alias("ra"),
+        _pct_change(both, "s").alias("rs"),
+        _pct_change(both, "close_splitadj").alias("rp"),
+        pl.col("date").shift(1).over("symbol").alias("prev"),
+        ((factor / factor.shift(1).over("symbol") - 1).abs() > 0.01).alias("split_day"),
+    ).drop_nulls(["ra", "rs", "rp"])
+    dates: list[date] = both["date"].to_list()
+    prevs: list[date] = both["prev"].to_list()
+    diff = pl.col("ra") - pl.col("rs")
+    both = both.with_columns(
+        (diff.abs() <= AGREE_BPS).alias("agree"),
+        ((pl.col("ra") - pl.col("rp")).abs() > DIV_DAY_GAP).alias("dist_day"),
+        diff.alias("diff"),
+        pl.Series("gap", [index[d] - index[p] for d, p in zip(dates, prevs, strict=True)]),
+        pl.Series(
+            "after_holiday",
+            [index[d] > 0 and ctx.calendar[index[d] - 1] != _previous_weekday(d) for d in dates],
+        ),
+    )
+    nxt = pl.col("diff").shift(-1).over("symbol")
+    missed = (pl.col("rs") - pl.col("rp")).abs() < 0.25 * (pl.col("ra") - pl.col("rp")).abs()
+    reversed_next = (pl.col("diff") * nxt < 0) & (
+        (pl.col("diff") + nxt).abs() < 0.5 * pl.col("diff").abs()
+    )
+    return both.with_columns(
+        pl.when(pl.col("dist_day") & missed)
+        .then(pl.lit("missed distribution"))
+        .when(pl.col("dist_day"))
+        .then(pl.lit("other distribution"))
+        .when(pl.col("after_holiday"))
+        .then(pl.lit("after holiday"))
+        .when(reversed_next)
+        .then(pl.lit("reversed next day"))
+        .when((pl.col("ra") == 0) | (pl.col("rs") == 0))
+        .then(pl.lit("one source unchanged"))
+        .otherwise(pl.lit("unexplained"))
+        .alias("category")
+    )
+
+
+def _previous_weekday(day: date) -> date:
+    return day - timedelta(days={0: 3, 6: 2}.get(day.weekday(), 1))
 
 
 def check_missing(ctx: _Context) -> CheckResult:
@@ -638,10 +737,16 @@ def write_report(report: CheckReport, path: Path) -> Path:
     ]
     for c in report.checks:
         status = {True: "pass", False: "**FAIL**", None: "n/a"}[c.passed]
-        lines.append(f"| {c.id} | {c.title} | {status} | {c.summary} |")
+        if c.passed is False and c.exception:
+            status = "**FAIL**, documented exception"
+        summary = f"{c.summary}. Exception: {c.exception}" if c.exception else c.summary
+        lines.append(f"| {c.id} | {c.title} | {status} | {summary} |")
     for c in report.checks:
-        if c.table:
+        if c.table or c.subtables:
             lines += ["", f"## {c.id} {c.title}", "", *_md_table(c.table)]
+        for title, rows in c.subtables:
+            if rows:
+                lines += ["", f"### {title}", "", *_md_table(rows)]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return path

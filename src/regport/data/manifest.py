@@ -31,6 +31,15 @@ def utc_stamp(now: datetime | None = None) -> str:
     return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def fresh_path(path: Path) -> Path:
+    """``path``, or ``stem-1``, ``stem-2``, ... if taken: a raw file is never overwritten."""
+    candidate, n = path, 0
+    while candidate.exists() or candidate.with_name(candidate.name + ".part").exists():
+        n += 1
+        candidate = path.with_name(f"{path.stem}-{n}{path.suffix}")
+    return candidate
+
+
 def utc_iso(now: datetime | None = None) -> str:
     return (now or datetime.now(UTC)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 

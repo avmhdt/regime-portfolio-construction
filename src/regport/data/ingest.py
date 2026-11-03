@@ -19,7 +19,14 @@ from regport.config import ExperimentConfig, Universe
 from regport.data import french as french_mod
 from regport.data.fred import FRED_BASE_URL, FredClient
 from regport.data.http import PoliteClient
-from regport.data.manifest import Manifest, ManifestEntry, sha256_file, utc_iso, utc_stamp
+from regport.data.manifest import (
+    Manifest,
+    ManifestEntry,
+    fresh_path,
+    sha256_file,
+    utc_iso,
+    utc_stamp,
+)
 from regport.data.sharadar import SFP_TABLE, SHARADAR_BASE_URL, SharadarClient, parse_sharadar_csv
 from regport.data.stooq import SNAPSHOT_DATE, build_index, read_stooq_file
 from regport.data.tiingo import TIINGO_BASE_URL, TiingoClient, tiingo_frame
@@ -95,7 +102,7 @@ def fetch_sharadar(
             text = client.table_csv(SFP_TABLE, ticker)
             if parse_sharadar_csv(text).is_empty():
                 raise DataSourceError(f"Sharadar {SFP_TABLE}/{ticker}: no rows")
-            dest = (
+            dest = fresh_path(
                 settings.data_dir / "raw" / "sharadar" / SFP_TABLE / f"{symbol}_{utc_stamp()}.csv"
             )
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -129,7 +136,12 @@ def fetch_stooq(
             raise DataSourceError(f"{stooq_symbol} not in the Stooq snapshot")
         source_file = index[stooq_symbol]
         frame = read_stooq_file(source_file)
-        dest = settings.data_dir / "raw" / "stooq" / f"{symbol}_{SNAPSHOT_DATE:%Y%m%d}.parquet"
+        dest = fresh_path(
+            settings.data_dir
+            / "raw"
+            / "stooq"
+            / f"{symbol}_{SNAPSHOT_DATE:%Y%m%d}_{utc_stamp()}.parquet"
+        )
         dest.parent.mkdir(parents=True, exist_ok=True)
         frame.write_parquet(dest)
         meta = {
@@ -164,7 +176,7 @@ def fetch_tiingo(
             ticker = universe.get(symbol).tiingo
             rows = client.prices_json(ticker)
             tiingo_frame(rows)
-            dest = settings.data_dir / "raw" / "tiingo" / f"{symbol}_{utc_stamp()}.json"
+            dest = fresh_path(settings.data_dir / "raw" / "tiingo" / f"{symbol}_{utc_stamp()}.json")
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(json.dumps(rows), encoding="utf-8", newline="")
             entry = manifest.add("tiingo", symbol, dest, f"{TIINGO_BASE_URL}/{ticker}/prices")
@@ -205,7 +217,7 @@ def fetch_fred(
             if not rows:
                 raise DataSourceError(f"{source} {series_id}: no observations")
             stamp = fetched_at.replace("-", "").replace(":", "")
-            dest = settings.data_dir / "raw" / source / f"{series_id}_{stamp}.json"
+            dest = fresh_path(settings.data_dir / "raw" / source / f"{series_id}_{stamp}.json")
             dest.parent.mkdir(parents=True, exist_ok=True)
             payload = {"series_id": series_id, "observations": rows}
             dest.write_text(json.dumps(payload), encoding="utf-8", newline="")
@@ -236,7 +248,7 @@ def fetch_french(
             if (done := _skip(manifest, "french", name, force)) is not None:
                 results.append(done)
                 continue
-            dest = settings.data_dir / "raw" / "french" / f"{name}_{utc_stamp()}.zip"
+            dest = fresh_path(settings.data_dir / "raw" / "french" / f"{name}_{utc_stamp()}.zip")
             client.download(dataset.url, dest)
             french_mod.parse_first_table(french_mod.read_zip_text(dest), dataset)
             entry = manifest.add("french", name, dest, dataset.url, {"file": dataset.file})
