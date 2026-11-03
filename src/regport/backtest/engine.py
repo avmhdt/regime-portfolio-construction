@@ -242,11 +242,19 @@ class _Strategy:
 def simulate(
     cfg: ExperimentConfig,
     panel: Panel,
-    universe: Universe,
+    universe: Universe | None,
     regime: RegimeOutputs | None = None,
+    costs: CostModel | None = None,
 ) -> tuple[pl.DataFrame, pl.DataFrame, dict[str, Any]]:
-    """Run the daily loop; returns the returns frame, the trade frame and run diagnostics."""
-    costs = _cost_model(cfg, universe)
+    """Run the daily loop; returns the returns frame, the trade frame and run diagnostics.
+
+    ``costs`` replaces the universe's cost table, for panels that aren't the ETF universe (the
+    Kenneth French industry robustness runs).
+    """
+    if costs is None:
+        if universe is None:
+            raise BacktestError("a universe or an explicit cost model is required")
+        costs = _cost_model(cfg, universe)
     rates = costs.rates(panel.symbols)
     view = None
     if cfg.regime.usage != "none":
@@ -357,14 +365,18 @@ def run_backtest(
     panel: Panel | None = None,
     tag: str = "",
     regime: RegimeOutputs | None = None,
+    costs: CostModel | None = None,
+    panel_label: str | None = None,
 ) -> BacktestResult:
     """One backtest; always appends exactly one trial-log row, even if it fails (FR-25)."""
     log_path = Path(cfg.logging.experiment_log)
     family = strategy_family(cfg)
     params = {**cfg.to_params(), "tag": tag, "config_hash": cfg.config_hash()}
+    if panel_label is not None:  # a panel other than the ETF universe (robustness runs)
+        params["panel"] = panel_label
     started = time.perf_counter()
     try:
-        universe = load_universe(cfg.data.universe_file)
+        universe = None if costs is not None else load_universe(cfg.data.universe_file)
         settings = settings or Settings()
         if panel is None:
             panel = Panel.load(settings.data_dir / "processed")
@@ -377,7 +389,7 @@ def run_backtest(
                 settings.regport_n_jobs,
                 models,
             )
-        frame, trades, diag = simulate(cfg, panel, universe, regime)
+        frame, trades, diag = simulate(cfg, panel, universe, regime, costs)
     except (BacktestError, ConstraintViolation, ValueError, KeyError, OSError) as exc:
         row = log_failed(family, params, f"failed: {type(exc).__name__}: {exc}", path=log_path)
         log.error("backtest_failed", run_id=row.run_id, error=str(exc))

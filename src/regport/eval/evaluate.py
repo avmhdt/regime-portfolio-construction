@@ -64,10 +64,10 @@ def load_runs(manifest: Path) -> tuple[list[Run], dict[str, Any]]:
 PairResult = tuple[float, float, float, float, int | None, float]
 
 
-def _pair(job: tuple[F64, F64, int, int]) -> PairResult:
+def _pair(job: tuple[F64, F64, int, int, int | None]) -> PairResult:
     """``(Δ annual, p_boot, p_hac, se_hac annual, block, Δ per period)``, strategy vs reference."""
-    a, b, n_boot, seed = job
-    boot = sharpe_diff_bootstrap(a, b, n_boot, None, seed)
+    a, b, n_boot, seed, block = job
+    boot = sharpe_diff_bootstrap(a, b, n_boot, block, seed)
     hac = sharpe_diff_hac(a, b)
     root = math.sqrt(DAYS)
     return hac.diff * root, boot.p_value, hac.p_value, hac.se * root, boot.block_size, hac.diff
@@ -108,8 +108,11 @@ def compare(
         for r in strategies
         if r.regime != "none"
     ]
+    block = cfg.evaluation.sharpe_test.block_size
+    fixed = None if block == "auto" else int(block)
     jobs = [
-        (_excess(a), _excess(b), n_boot, cfg.seed + i) for i, (a, b) in enumerate(pairs + ablation)
+        (_excess(a), _excess(b), n_boot, cfg.seed + i, fixed)
+        for i, (a, b) in enumerate(pairs + ablation)
     ]
     if n_jobs > 1:
         with ProcessPoolExecutor(max_workers=n_jobs) as pool:
@@ -206,17 +209,24 @@ class TrialSummary:
     var_trials_annual: float
 
 
+def _config_key(row: dict[str, str]) -> str:
+    """A trial's configuration: its parameters without the free-text tag, plus the panel.
+
+    Runs logged before the ``panel`` parameter existed (the first Kenneth French robustness
+    runs) carry their industry dataset only in the tag, so it is read from there.
+    """
+    params = {k: v for k, v in json.loads(row["params_json"]).items() if k != "tag"}
+    tag = json.loads(row["params_json"]).get("tag", "")
+    if "panel" not in params and str(tag).startswith("robustness:french:"):
+        params["panel"] = "french:" + str(tag).split(":")[2]
+    return json.dumps(params, sort_keys=True)
+
+
 def trial_summary(log_path: Path, table: pl.DataFrame, runs: list[Run]) -> TrialSummary:
     """AC-H-04: the honest trial count and the DSR of the best non-1/N strategy in this grid."""
     rows = read_trial_log(log_path)
     valid = [r for r in rows if int(r["n_obs"]) > 0]
-    params = {
-        json.dumps(
-            {k: v for k, v in json.loads(r["params_json"]).items() if k not in ("tag",)},
-            sort_keys=True,
-        )
-        for r in rows
-    }
+    params = {_config_key(r) for r in rows}
     sr = np.array([float(r["sharpe_annual"]) for r in valid]) / math.sqrt(DAYS)
     var = float(np.var(sr, ddof=1)) if sr.size > 1 else 0.0
     strategies = table.filter(pl.col("strategy") != "1/N").sort("sharpe", descending=True)

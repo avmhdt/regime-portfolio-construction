@@ -2,7 +2,7 @@
 
 > Detect market regimes in real time and compare allocation methods honestly against the 1/N benchmark.
 
-**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; M5 (regime layer, preregistration) is done; the research memo replaces this README at M7.
+**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer), M3 (risk models) and M4 (optimizers, costs, backtest engine) are done; M5 (regime layer, preregistration) and M6 (evaluation, robustness, scaling) are done; the research memo replaces this README at M7.
 
 | | |
 |---|---|
@@ -47,9 +47,9 @@ Raw and licensed data live in `data/`, which is git-ignored. Only download scrip
 
 ### Impresses hirers
 
-- [ ] An out-of-sample comparison against 1/N with a proper Sharpe-difference test (Ledoit and Wolf 2008), reported honestly even if 1/N wins.
-- [ ] An ablation showing what the regime layer adds over the optimizer alone, net of turnover.
-- [ ] Stress tests through 2008, 2020 and 2022 with drawdown and recovery statistics.
+- [x] An out-of-sample comparison against 1/N with a proper Sharpe-difference test (Ledoit and Wolf 2008), reported honestly even if 1/N wins. (AC-H-01: [reports/oos_vs_1n.md](reports/oos_vs_1n.md); no strategy beats 1/N after Holm)
+- [x] An ablation showing what the regime layer adds over the optimizer alone, net of turnover. (AC-H-02: [reports/ablation.md](reports/ablation.md))
+- [x] Stress tests through 2008, 2020 and 2022 with drawdown and recovery statistics. (AC-H-03: [reports/stress.md](reports/stress.md))
 
 ## Development
 

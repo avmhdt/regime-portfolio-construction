@@ -125,10 +125,18 @@ def write_evaluation(
         "p_holm",
         "ceq",
         "annual_turnover",
-        "annual_cost_drag",
+        "cost_drag_bps",
         "max_drawdown",
     ]
-    ordered = table.sort("sharpe", descending=True)
+    # Costs are a few bps a year: show them in bps, keep fractions in the CSV.
+    ordered = table.sort("sharpe", descending=True).with_columns(
+        (pl.col("annual_cost_drag") * 1e4).alias("cost_drag_bps")
+    )
+    ablation_view = (
+        ablation.with_columns((pl.col("delta_cost_drag") * 1e4).alias("delta_cost_drag_bps"))
+        if not ablation.is_empty()
+        else ablation
+    )
     lines = [
         "# Out-of-sample comparison with 1/N",
         "",
@@ -165,6 +173,9 @@ def write_evaluation(
         f"- Deflated Sharpe ratio (Bailey and López de Prado 2014), with N = {trials.rows} trials "
         f"and the variance of their Sharpe ratios ({trials.var_trials_annual:.4f}, annual): "
         f"expected maximum Sharpe under the null {trials.sr0_annual:.3f}; DSR = {trials.dsr:.3f}.",
+        "  The DSR asks whether the best strategy's Sharpe ratio exceeds what the best of N "
+        "zero-skill trials would show by luck; it is not a test against 1/N, which the table "
+        "above answers.",
         "",
         "## Constraint audit (AC-W-02)",
         "",
@@ -185,19 +196,23 @@ def write_evaluation(
         "Differences are arm minus base; p-values are the Ledoit-Wolf bootstrap and HAC tests of "
         "the paired Sharpe difference.",
         "",
-        *md_table(
-            ablation.sort("optimizer", "regime"),
-            [
-                "optimizer",
-                "regime",
-                "delta_sharpe",
-                "p_bootstrap",
-                "p_hac",
-                "delta_ceq",
-                "delta_turnover",
-                "delta_cost_drag",
-                "delta_max_drawdown",
-            ],
+        *(
+            md_table(
+                ablation_view.sort("optimizer", "regime"),
+                [
+                    "optimizer",
+                    "regime",
+                    "delta_sharpe",
+                    "p_bootstrap",
+                    "p_hac",
+                    "delta_ceq",
+                    "delta_turnover",
+                    "delta_cost_drag_bps",
+                    "delta_max_drawdown",
+                ],
+            )
+            if not ablation_view.is_empty()
+            else ["No regime arms in this grid."]
         ),
         "",
         "![Ablation Sharpe](figures/ablation_sharpe.png)",

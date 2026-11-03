@@ -214,3 +214,20 @@ Relayed by the 15-projects review session.
 | 1/1000 | 5 | 19 | 0 | 0.23 | yes | 9,751.76 |
 | 1/1000 | 10 | 18 | 0 | 0.21 | yes | 9,734.80 |
 | 1/1000 | 20 | 14 | 0 | 0.20 | no | 9,706.80 |
+
+## M6 choices and results (2026-11-03)
+
+| Topic | Choice or result | Why |
+|---|---|---|
+| Trial log | 81 rows, 0 failed, 81 distinct configurations: the 17-cell grid, then 64 robustness runs (36 cost grid, 9 common start, 18 Kenneth French, 1 ALFRED revised). The `overfitlab` validator reports 0 errors | AC-W-09, AC-H-04 |
+| Dirty-tree rows | 79 rows carry `-dirty` git SHAs (`W_DIRTY`), because I edited the working tree while the grid and robustness suites ran. Each process ran the code it loaded at start: commit `687268b` for the grid, the M6 working tree for robustness. Rows are never edited (append-only). From M7, runs start only on a clean, committed tree | Honest disclosure |
+| French runs' panel | The first 18 French runs record their industry dataset only in the trial tag. The distinct-configuration count reads it from there; later runs record it as a `panel` parameter | The log is append-only |
+| Headline result | No strategy beats 1/N at 5% after Holm's adjustment. The preregistered headline (ERC with the HMM layer on feature set A) has net Sharpe 0.677 against 0.568 for 1/N, bootstrap p = 0.31. The best of 16 (ERC with BOCPD, 0.729) has p = 0.26 | AC-H-01 |
+| Power | The minimum Sharpe difference detectable at 80% power is about 0.31 to 0.59 per pair (HAC) | R-05 |
+| Bootstrap | 5,000 resamples, block size calibrated per pair (Algorithm 3.1) with 200 VAR(1) simulations of 499 resamples per candidate block. The calibration's simulation counts are the agent's choice, since the paper's are much larger | Runtime: all 28 pairs took 3.5 min on 8 processes |
+| Sharpe intervals | 95% percentile circular block bootstrap, block 10, 2,000 resamples | Ablation figure |
+| ALFRED comparison (AC-H-07) | The point-in-time and revised HMM runs are labelled independently, so their probabilities are compared label-invariantly: stress probability, Hungarian-matched states and argmax agreement. A first version compared raw state indices (0.40) and was replaced before publication. Results: stress-probability MAD 0.33, matched per-state MAD 0.29, most-likely state agreeing on 43% of days. Net Sharpe 0.691 point in time vs 0.695 revised | Labels from separate fits don't correspond |
+| French robustness | Value-weighted daily industries from 1990-01-02, uniform 5 bps, RF from the FF series. Regime features use the FF market factor and BAA10Y from 1986, so the HMM is available only after its first fit (2,520 days) | FR-30. Costs are an assumption for industry portfolios |
+| AQR robustness | **Not run.** FR-06 is a Could item (R-12 drops Could items first). The engine is daily and ETF-based; the AQR file holds monthly self-financing factor returns, which need a monthly path, a Sharpe on 12 periods a year in the trial log, and a cost assumption | Scope |
+| Scaling | Timings are wall-clock medians, reported but not frozen in the report-hash check (M7) | They vary between runs |
+| Cost drag | Shown in bps in the Markdown reports; the CSVs keep fractions | Per-asset costs of 1 to 5 bps round to 0.000 as fractions |
