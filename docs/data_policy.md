@@ -11,7 +11,7 @@ How the raw data are sourced, timed and checked. The results of the checks are i
 | FRED | DTB3, BAA10Y, T10Y3M, VIXCLS (current values) | `series/observations` | Aggregates only; BAA10Y and VIXCLS are never plotted or tabulated |
 | ALFRED | Every vintage of UNRATE, PAYEMS, INDPRO, CPIAUCSL | `series/observations` with `realtime_start=1776-07-04`, `realtime_end=9999-12-31` | Aggregates only |
 | Kenneth French Data Library | FF3 daily factors with RF; 10 and 49 industry portfolios, value-weighted, daily | Zip downloads, capped at 8 MB/s | Aggregates only; files never redistributed |
-| AQR | Century of Factor Premia, Time Series Momentum (monthly) | The owner's manual downloads (P-08), copied into `data/raw/aqr/` | **Nothing.** Local use only until AQR gives written permission (owner ruling, 2026-11-03) |
+| AQR | Century of Factor Premia, Time Series Momentum (monthly) | The owner's manual downloads (P-08), copied into `data/raw/aqr/` | Aggregates only, with AQR cited: AQR gave written permission (owner ruling, 2026-11-03). Workbooks and raw series are never redistributed |
 
 Tiingo is implemented as an optional third source (`--source tiingo`), but it isn't used: the owner has no key, and none is needed.
 

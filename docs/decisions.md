@@ -30,7 +30,8 @@ Owner decisions copied from the owner-level `DECISIONS.md` on 2026-11-03, follow
   - **Kenneth French:** the library is cited, and its files are never redistributed. Its page states no terms beyond a copyright notice.
   - **Stooq:** never committed. No published terms were found for the bulk files.
   - **Sharadar:** already confirmed in writing; aggregates only.
-- **AQR (ruled 2026-11-03): dropped from everything public.** AQR's site terms prohibit publishing "any information obtained from this Website" without its written consent. The AQR robustness run (FR-06, Could) may be run locally only. Nothing about it is published, not even a statement of its results. It comes back only if AQR gives written permission, which the owner is requesting. `regport fetch all` doesn't touch AQR.
+- **AQR, first ruling (2026-11-03, superseded the same day):** dropped from everything public, because AQR's site terms prohibit publishing "any information obtained from this Website" without its written consent. The run was allowed locally only, until AQR gave written permission.
+- **AQR, current ruling (2026-11-03):** the owner reported, through the 15-projects review session, that AQR has given written permission: "AQR has greenlighted publishing our results. Proceed." The AQR robustness run (FR-06, Could, M6) may be published as aggregate results, with AQR cited. Workbooks and raw series are never redistributed or committed. AQR is a manual download (P-08), so `regport fetch all` doesn't fetch it.
 
 ### Money
 
@@ -81,7 +82,7 @@ D-02 to D-14 stand as written in the spec:
 | M2 | `pit_approx` | `macro_pit` carries `pit_approx` as an extra column, so `value_asof` and the table agree; `macro_vintages.pit_approx` marks rows of each series' earliest vintage, the only rows a DQ-10 approximation can use | The schema lists `pit_approx` only on `macro_vintages` |
 | M2 | ALFRED business day | `asof - 1 business day` means one weekday back (`numpy.busday_offset`), not one trading day | A release on an exchange holiday (the jobs report on Good Friday) is public on the next weekday |
 | M2 | Download cap | File downloads stream at no more than 8 MB/s, below the owner's 10 MB/s cap for this PC | Live recorders share the connection |
-| M2 | AQR parser | Deferred to M6, local-only | FR-06 is Could and listed under M6; nothing AQR is published (owner ruling) |
+| M2 | AQR parser | Deferred to M6 | FR-06 is Could and listed under M6. Aggregate AQR results may be published there, with AQR cited (owner ruling after AQR's permission) |
 | M2 | French range check | DQ-11 fails on returns below -100% (impossible); returns above +100% are counted, not failed | Two 1930s days in the 49-industry file (Paper, MedEq) exceed +100%, which is real for thin early portfolios |
 
 ## Open questions for the owner

@@ -122,7 +122,7 @@ def fetch_all(
     symbols: SymbolsOption = None,
     force: ForceOption = False,
 ) -> None:
-    """Every fetch above, in order. AQR is local-only and not part of this (owner ruling)."""
+    """Every fetch above, in order. AQR is a manual download (P-08) and is parsed from M6."""
     _run_fetch("all", config, source, symbols, force)
 
 
