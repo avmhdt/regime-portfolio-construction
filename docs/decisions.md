@@ -113,3 +113,20 @@ Answered in the main session and relayed by the 15-projects review session.
    - **Cause not established.** For the 250 one-day differences and the 301 unexplained days, the evidence doesn't show which source is off or why. Settling it would need a third source.
    - **Distribution days excluded,** the sources agree on 99.07% of days overall. Per asset, everything is at or above 99% except TLT (97.52%), DBC (98.35%) and SPY (98.77%).
    - The full table is in `reports/data_quality.md`.
+
+## M3 protocol, fixed before the first real covariance evaluation (2026-11-03)
+
+- **D-12 selection rule:**
+  - The chosen estimator is the one with the lowest mean QLIKE at h = 21 trading days, over non-overlapping origins whose realized window ends on or before 2014-12-31.
+  - The mean is taken over 101 evaluation portfolios: 1/N and the 100 random Dirichlet(1) portfolios.
+  - QLIKE is Patton's (2011) `log F + RV / F`, where F is the forecast h-day variance and RV is the sum of squared daily portfolio returns over the h days.
+  - The bias statistic and the min-variance realized volatility are reported beside it but don't decide.
+  - The chosen estimator replaces `risk.estimator` in `configs/base.yaml` if it differs from the default `ledoit_wolf`.
+- **Asset set at each origin:**
+  - An asset must be eligible on the origin date (D-02).
+  - It must have at most 5% null returns in the 504-day window, following DQ-04 literally, with pre-inception days counting as null. So a newly eligible ETF enters covariance-based portfolios only once about 480 of its last 504 returns are valid.
+  - Rows with any remaining null among the selected assets are dropped from that window.
+- **Origins:** every h-th trading date from the first date at or after 2005-01-03. Covariances use returns up to and including the origin date. Each realized window is the next h trading days and must end by `oos_end`, which is the last trading date of the last complete month.
+- **Portfolio returns:** fixed weights over the h days. The h-day portfolio return is the weighted sum of each asset's compounded h-day return. The forecast is `sqrt(w' Σ_daily w · h)`.
+- **Min-variance in the evaluation:** FR-17's long-only problem with the 0.40 cap. The cap is raised to 1/N when fewer than three assets make 0.40 infeasible.
+- **EWMA:** RiskMetrics zero-mean recursion with λ = 0.5^(1/63) over the 504-day window, weights normalized to sum to 1, which is the bias correction. Sample, Ledoit–Wolf and OAS demean.
