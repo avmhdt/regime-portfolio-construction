@@ -1,5 +1,6 @@
 # Data: never commit raw or licensed data
 data/
+!src/regport/data/
 *.parquet
 *.feather
 *.h5
