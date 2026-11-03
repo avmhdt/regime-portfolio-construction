@@ -24,6 +24,7 @@ from scipy.stats import norm
 from regport.config import ExperimentConfig
 from regport.eval.dsr import deflated_sharpe
 from regport.eval.sharpe_test import holm, sharpe_diff_bootstrap, sharpe_diff_hac
+from regport.resources import wait_for_memory
 from regport.tracking.experiment_log import read_trial_log
 
 F64 = npt.NDArray[np.float64]
@@ -115,6 +116,7 @@ def compare(
         for i, (a, b) in enumerate(pairs + ablation)
     ]
     if n_jobs > 1:
+        wait_for_memory("evaluate bootstrap")
         with ProcessPoolExecutor(max_workers=n_jobs) as pool:
             results = list(pool.map(_pair, jobs))
     else:

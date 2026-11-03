@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
@@ -541,17 +542,25 @@ def reproduce(
         reference = json.loads((reports / "manifest.json").read_text(encoding="utf-8"))["tables"]
         shutil.rmtree(ref_dir, ignore_errors=True)
         shutil.copytree(reports / "tables", ref_dir)
+    from regport.resources import wait_for_memory
+
     shutil.rmtree(settings.results_dir / "regime", ignore_errors=True)  # recompute, don't reuse
-    data_build(config)
-    data_check(config)
-    regime_run(config, model="all", features=None, force=True)
-    cov_eval(config)
-    grid(Path("configs/ablation.yaml"))
-    evaluate(config)
-    stress(config)
-    robustness(config, suite="all", report_only=False)
-    regime_report(config)
-    bench_scaling(config)
+    stages: list[tuple[str, Callable[[], None]]] = [
+        ("data build", lambda: data_build(config)),
+        ("data check", lambda: data_check(config)),
+        ("regime run", lambda: regime_run(config, model="all", features=None, force=True)),
+        ("cov-eval", lambda: cov_eval(config)),
+        ("grid", lambda: grid(Path("configs/ablation.yaml"))),
+        ("evaluate", lambda: evaluate(config)),
+        ("stress", lambda: stress(config)),
+        ("robustness", lambda: robustness(config, suite="all", report_only=False)),
+        ("regime report", lambda: regime_report(config)),
+        ("bench scaling", lambda: bench_scaling(config)),
+    ]
+    for name, run in stages:
+        free = wait_for_memory(f"reproduce: {name}")
+        typer.echo(f"== {name} (free memory {free:.0f} GB)")
+        run()
     _finish_reports(config, settings)
     typer.echo(f"reproduce finished in {time.perf_counter() - started:.0f} s")
     if check:
