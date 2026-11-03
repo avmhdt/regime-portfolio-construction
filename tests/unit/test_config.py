@@ -16,7 +16,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_base_config_matches_spec_defaults() -> None:
     cfg = load_config(ROOT / "configs/base.yaml")
-    assert cfg == ExperimentConfig()
+    # risk.estimator is the D-12 choice from M3; every other value is the spec default.
+    assert cfg.risk.estimator == "ewma"
+    assert cfg.model_copy(
+        update={"risk": cfg.risk.model_copy(update={"estimator": "ledoit_wolf"})}
+    ) == (ExperimentConfig())
     assert cfg.sample.oos_start == date(2005, 1, 3)
     assert cfg.optimizer.max_weight == 0.40
     assert cfg.execution.threshold_abs == 0.02

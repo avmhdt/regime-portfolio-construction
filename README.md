@@ -2,7 +2,7 @@
 
 > Detect market regimes in real time and compare allocation methods honestly against the 1/N benchmark.
 
-**Status:** in progress. M1 (scaffolding, CI, data-access smoke test) is done; the research memo replaces this README at M7.
+**Status:** in progress. M1 (scaffolding, CI, smoke test), M2 (point-in-time data layer) and M3 (risk models) are done; the research memo replaces this README at M7.
 
 | | |
 |---|---|
@@ -14,9 +14,9 @@
 
 ## Requirements
 
-- [ ] A multi-asset universe of 10–20 liquid ETFs or futures proxies across equities, rates, credit, commodities and FX.
+- [x] A multi-asset universe of 10–20 liquid ETFs or futures proxies across equities, rates, credit, commodities and FX. (FR-01, FR-07; AC-W-05 with SPY's 1998 start as a documented exception)
 - [ ] Regime models using filtered (real-time) probabilities only: Gaussian HMM and Bayesian online change-point detection.
-- [ ] Covariance estimators (sample, EWMA, Ledoit–Wolf, OAS) evaluated on out-of-sample risk forecasts.
+- [x] Covariance estimators (sample, EWMA, Ledoit–Wolf, OAS) evaluated on out-of-sample risk forecasts. (FR-09, FR-10; [reports/cov_eval.md](reports/cov_eval.md))
 - [ ] Optimizers: minimum variance, equal risk contribution, HRP (López de Prado 2016), and constrained mean–variance with a turnover penalty.
 - [ ] A 1/N benchmark (DeMiguel, Garlappi and Uppal 2009) and cost-aware rebalancing.
 
@@ -43,7 +43,7 @@ Raw and licensed data live in `data/`, which is git-ignored. Only download scrip
 
 - [ ] A unit test shows regime probabilities at time t never use data after t (no smoothed-state leakage).
 - [ ] ERC portfolios have equal risk contributions within 1e-6, and constraints always hold.
-- [ ] The ex-ante vs ex-post volatility bias statistic is close to 1 for your chosen estimator.
+- [x] The ex-ante vs ex-post volatility bias statistic is close to 1 for your chosen estimator. (AC-W-03, EWMA chosen by D-12; [reports/cov_eval.md](reports/cov_eval.md))
 
 ### Impresses hirers
 
