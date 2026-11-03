@@ -31,6 +31,12 @@ Raw and licensed data live in `data/`, which is git-ignored. Only download scrip
 | [AQR datasets](https://www.aqr.com/Insights/Datasets) | Free | Long histories of momentum, value and carry across asset classes. |
 | [Kenneth French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) | Free | Industry and factor portfolios for robustness checks. |
 
+### Credits and notices
+
+- Prices: Sharadar Fund Prices (SFP), used under the owner's licence; only aggregates are published. Stooq daily data serve as a cross-check only.
+- This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Series: DTB3, T10Y3M (Board of Governors); BAA10Y (Moody's, used only as a model input); VIXCLS (Chicago Board Options Exchange, CBOE Volatility Index: VIX, retrieved from FRED); ALFRED vintages of UNRATE, PAYEMS, CPIAUCSL (BLS) and INDPRO (Board of Governors).
+- Kenneth R. French Data Library, Tuck School of Business at Dartmouth: Fama/French 3 factors and 10/49 industry portfolios (daily). Files are not redistributed.
+
 ## Success criteria
 
 ### Works (correct and reproducible)

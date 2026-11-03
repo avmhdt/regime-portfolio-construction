@@ -5,9 +5,11 @@ log line or exception message.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Mapping
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -27,6 +29,8 @@ log = get_logger(__name__)
 
 SECRET_PARAMS = frozenset({"api_key", "apikey", "token", "key"})
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+# The owner caps downloads on this PC at 10 MB/s while live recorders run.
+MAX_BYTES_PER_S = 8_000_000.0
 
 
 class _Retryable(Exception):
@@ -131,3 +135,37 @@ class PoliteClient:
             return attempt()
         except _Retryable as exc:
             raise DataSourceError(str(exc)) from None
+
+    def download(self, url: str, dest: Path, max_bytes_per_s: float = MAX_BYTES_PER_S) -> int:
+        """Stream ``url`` to ``dest`` at no more than ``max_bytes_per_s``; return the byte count.
+
+        Writes to a temporary file first, so an interrupted download never leaves a partial raw
+        file behind.
+        """
+        host = urlsplit(url).netloc
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(dest.name + ".part")
+        total = 0
+        with self._host_lock(host):
+            wait = self._last.get(host, 0.0) + self._min_interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            started = time.monotonic()
+            try:
+                with self._client.stream("GET", url) as response:
+                    if response.status_code != 200:
+                        raise DataSourceError(f"HTTP {response.status_code} for {redact_url(url)}")
+                    with tmp.open("wb") as fh:
+                        for chunk in response.iter_bytes(chunk_size=1 << 16):
+                            fh.write(chunk)
+                            total += len(chunk)
+                            ahead = total / max_bytes_per_s - (time.monotonic() - started)
+                            if ahead > 0:
+                                time.sleep(ahead)
+            except httpx.TransportError as exc:
+                tmp.unlink(missing_ok=True)
+                raise DataSourceError(f"{type(exc).__name__} for {redact_url(url)}") from None
+            finally:
+                self._last[host] = time.monotonic()
+        os.replace(tmp, dest)
+        return total

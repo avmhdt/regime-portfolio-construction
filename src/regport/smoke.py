@@ -15,6 +15,7 @@ import polars as pl
 
 from regport.config import ExperimentConfig, load_universe
 from regport.data.fred import FredClient, observations_frame
+from regport.data.ingest import resolve_price_source
 from regport.data.sharadar import SharadarClient
 from regport.data.stooq import SNAPSHOT_DATE, build_index, read_stooq_file
 from regport.errors import DataSourceError
@@ -39,14 +40,6 @@ class SmokeStep:
         span = f"{self.first} .. {self.last}" if self.first else "-"
         text = f"[{status}] {self.name:<8} source={self.source:<9} rows={self.rows:<7} {span}"
         return f"{text}  {self.detail}".rstrip()
-
-
-def resolve_price_source(cfg: ExperimentConfig, settings: Settings) -> str:
-    """D-01 ``auto``: Sharadar if ``SHARADAR_API_KEY`` is set, else the local Stooq snapshot."""
-    source = cfg.data.price_source
-    if source == "auto":
-        return "sharadar" if settings.has_key("sharadar") else "stooq"
-    return source
 
 
 def _span(frame: pl.DataFrame, column: str) -> tuple[date | None, date | None]:
