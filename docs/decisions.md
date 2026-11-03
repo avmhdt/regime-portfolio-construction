@@ -231,3 +231,4 @@ Relayed by the 15-projects review session.
 | AQR robustness | **Not run.** FR-06 is a Could item (R-12 drops Could items first). The engine is daily and ETF-based; the AQR file holds monthly self-financing factor returns, which need a monthly path, a Sharpe on 12 periods a year in the trial log, and a cost assumption | Scope |
 | Scaling | Timings are wall-clock medians, reported but not frozen in the report-hash check (M7) | They vary between runs |
 | Cost drag | Shown in bps in the Markdown reports; the CSVs keep fractions | Per-asset costs of 1 to 5 bps round to 0.000 as fractions |
+| Trial SHA provenance | All 81 rows record commit `687268b`. The M6 branch was rebased onto `main` before its PR, so that commit is kept reachable by the tag `trials/m6-687268b` | A recorded `git_sha` must stay resolvable |
