@@ -12,10 +12,10 @@
   "robustness_common_start.csv": "ae6ec8bd1565cc6e76d2a357c4cec41a2b020c3ea7d91bf89a8e56a26149a321",
   "robustness_costs.csv": "8cfd2f5b2b3d886524e3bf55dc1af387fba20c7ec96ba0f38e6b16ed8866e19c",
   "robustness_french.csv": "bdd38b9d61eee57dd378fe48a7fe874b86900ce70700e9038ecd12eb856fd53a",
-  "scaling.csv": "8d620eb3b9688bd295d63fcb99eb6bc7d17c6e209d4af4c4031b7f674a57d5f9",
+  "scaling.csv": "ab3668c2f60bef990d5390027f15222f28540a8cc983ea04dd4fd34fb848fe01",
   "scaling_condition.csv": "16765abc8bd514cef729324acc2c44b9571a14dab5a1a7610598b46b107b10a4",
   "stress.csv": "094c0414527d4cd9129b79944a6635fc631888a7c0beae75176b8211d3a63bd9",
-  "trials.csv": "abb1b9c0d76442561c2e236d009106dba2fcdf93684a3c5b860d76e33fc32f37"
+  "trials.csv": "c10bca5af93374933983bdd51795bc1bbc4c337747e60ac555da64be662d007a"
  },
  "uncompared": {
   "scaling.csv": "wall-clock times are reported, not compared",
