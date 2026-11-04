@@ -3,9 +3,10 @@
 Regenerate only on purpose, with the reason in the commit message:
 ``REGPORT_UPDATE_GOLDEN=1 uv run pytest tests/golden``.
 
-Values are stored rounded to 1e-10. Solver-based optimizers (min-variance, mean-variance) are
-compared within 1e-8, because interior-point results differ in the last digits across
-platforms; the rest within 1e-9, since two values 1e-11 apart can round 1e-10 apart.
+Values are stored rounded to 1e-10. Mean-variance is compared within 1e-8, because
+interior-point results differ in the last digits across platforms; the rest within 1e-9, since
+two values 1e-11 apart can round 1e-10 apart. Min-variance weights are polished to the exact
+KKT point, so they get the 1e-9 tolerance too.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ METRICS = [
     "annual_cost_drag",
     "effective_n_assets",
 ]
-TOL = {"min_variance": 1e-8, "mv_turnover": 1e-8}
+TOL = {"mv_turnover": 1e-8}
 
 
 def _snapshot(name: str, tmp_path: Path, universe: Path, panel: Panel) -> dict[str, Any]:

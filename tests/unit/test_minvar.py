@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 import pytest
 
 from regport.errors import ConstraintViolation
 from regport.opt import minvar
 from regport.opt.constraints import check_constraints, clean_weights, effective_cap
-from regport.opt.minvar import SolverError, min_variance
+from regport.opt.minvar import SolverError, min_variance, polish
 
 
 def _cov(n: int, seed: int) -> np.ndarray:
@@ -38,6 +40,52 @@ def test_cap_binds_and_variance_is_minimal() -> None:
             other = rng.dirichlet(np.ones(8))
             if other.max() <= 0.40:
                 assert var <= other @ cov @ other + 1e-10
+
+
+def _enumerated_optimum(cov: np.ndarray, cap: float) -> np.ndarray:
+    """Exact optimum by trying every assignment of assets to 0, the cap, or free."""
+    n = cov.shape[0]
+    best, best_var = None, np.inf
+    for code in itertools.product((0, 1, 2), repeat=n):
+        state = np.array(code)
+        free, at_cap = state == 2, state == 1
+        if not free.any():
+            continue
+        w = np.where(at_cap, cap, 0.0)
+        budget = 1.0 - cap * at_cap.sum()
+        s_ff = cov[np.ix_(free, free)]
+        x = np.linalg.solve(s_ff, np.ones(free.sum()))
+        y = np.linalg.solve(s_ff, cov[np.ix_(free, at_cap)] @ np.full(at_cap.sum(), cap))
+        w[free] = (budget + y.sum()) / x.sum() * x - y
+        if w.min() >= -1e-14 and w.max() <= cap + 1e-14 and w @ cov @ w < best_var:
+            best, best_var = w, float(w @ cov @ w)
+    assert best is not None
+    return best
+
+
+def test_polished_weights_are_the_exact_optimum() -> None:
+    for seed in range(6):
+        cov = _cov(6, seed) * 1e-4
+        expected = _enumerated_optimum(cov, 0.40)
+        assert np.max(np.abs(min_variance(cov, 0.40) - expected)) <= 1e-12
+
+
+def test_weights_do_not_depend_on_solver_history() -> None:
+    """NFR-02: the same covariance gives bit-identical weights whatever was solved before."""
+    covs = [_cov(9, seed) * 1e-4 for seed in range(10)]
+    first = [min_variance(c, 0.40) for c in covs]
+    minvar._problem.cache_clear()
+    for seed in range(40):
+        min_variance(_cov(9, 100 + seed), 0.40)
+    again = [min_variance(c, 0.40) for c in covs]
+    assert all(np.array_equal(a, b) for a, b in zip(first, again, strict=True))
+
+
+def test_polish_keeps_weights_that_fail_the_kkt_check() -> None:
+    cov = np.array([[0.04, 0.05, 0.0], [0.05, 0.09, 0.0], [0.0, 0.0, 0.05]])
+    assert np.linalg.solve(cov, np.ones(3)).min() < 0  # all-free KKT point is infeasible
+    w = np.full(3, 1 / 3)
+    assert polish(cov, w, 1.0) is w
 
 
 def test_small_universes() -> None:
