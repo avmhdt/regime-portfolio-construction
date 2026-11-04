@@ -94,7 +94,7 @@ Of 12 regime arms, 0 change the net Sharpe ratio significantly at 5% (unadjusted
 ### How many configurations were tried
 
 <!-- regport:trials:start -->
-The trial log holds 81 backtests (0 failed) over 81 distinct configurations, every run included. The best strategy, `erc+bocpd` (net Sharpe 0.73), has a deflated Sharpe ratio of 1.00 against the best of 81 zero-skill trials (expected maximum 0.38); that is a test of skill against zero, not against 1/N.
+The trial log holds 243 backtests (0 failed) over 81 distinct configurations, every run included. The best strategy, `erc+bocpd` (net Sharpe 0.73), has a deflated Sharpe ratio of 1.00 against the best of 243 zero-skill trials (expected maximum 0.44); that is a test of skill against zero, not against 1/N.
 <!-- regport:trials:end -->
 
 Reports: [1/N](reports/oos_vs_1n.md) · [ablation](reports/ablation.md) · [stress](reports/stress.md) · [robustness](reports/robustness.md) · [covariance](reports/cov_eval.md) · [regimes](reports/regimes.md) · [scaling](reports/scaling.md) · [data quality](reports/data_quality.md).
