@@ -551,9 +551,11 @@ def reproduce(
         ("regime run", lambda: regime_run(config, model="all", features=None, force=True)),
         ("cov-eval", lambda: cov_eval(config)),
         ("grid", lambda: grid(Path("configs/ablation.yaml"))),
+        # Robustness first: its backtests append to the trial log, and evaluate's trial count
+        # (AC-H-04) should include every row this reproduction adds.
+        ("robustness", lambda: robustness(config, suite="all", report_only=False)),
         ("evaluate", lambda: evaluate(config)),
         ("stress", lambda: stress(config)),
-        ("robustness", lambda: robustness(config, suite="all", report_only=False)),
         ("regime report", lambda: regime_report(config)),
         ("bench scaling", lambda: bench_scaling(config)),
     ]
