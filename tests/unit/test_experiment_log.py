@@ -211,6 +211,24 @@ def test_git_sha_outside_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert el.git_sha(tmp_path / "log.csv") == "0" * 40 + "-dirty"
 
 
+def test_git_sha_ignores_generated_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def git(*args: str) -> None:
+        el.subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    git("init", "-q")
+    for name in ("code.py", "reports/table.csv", "results/grids/g.json", "log.csv"):
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text("a", encoding="utf-8")
+    git("add", ".")
+    git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init")
+    monkeypatch.chdir(tmp_path)
+    for name in ("reports/table.csv", "results/grids/g.json", "log.csv"):
+        (tmp_path / name).write_text("b", encoding="utf-8")
+    assert not el.git_sha(tmp_path / "log.csv").endswith("-dirty")
+    (tmp_path / "code.py").write_text("b", encoding="utf-8")
+    assert el.git_sha(tmp_path / "log.csv").endswith("-dirty")
+
+
 def test_git_sha_log_outside_repo(tmp_path: Path) -> None:
     assert el._GIT_SHA.match(el.git_sha(tmp_path / "elsewhere.csv"))
 

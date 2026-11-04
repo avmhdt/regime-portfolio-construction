@@ -54,9 +54,9 @@ Minimum Sharpe difference detectable at 80% power and 5% two-sided, from each pa
 
 ## Trials
 
-- Rows in `results/trial_log.csv` when this report was built: 81 (0 failed), 81 distinct configurations.
+- Rows in `results/trial_log.csv` when this report was built: 324 (0 failed), 81 distinct configurations.
 - Best non-1/N strategy here: `erc+bocpd`, net Sharpe 0.729.
-- Deflated Sharpe ratio (Bailey and López de Prado 2014), with N = 81 trials and the variance of their Sharpe ratios (0.0245, annual): expected maximum Sharpe under the null 0.385; DSR = 1.000.
+- Deflated Sharpe ratio (Bailey and López de Prado 2014), with N = 324 trials and the variance of their Sharpe ratios (0.0243, annual): expected maximum Sharpe under the null 0.455; DSR = 0.999.
   The DSR asks whether the best strategy's Sharpe ratio exceeds what the best of N zero-skill trials would show by luck; it is not a test against 1/N, which the table above answers.
 
 ## Constraint audit (AC-W-02)

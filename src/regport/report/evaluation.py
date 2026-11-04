@@ -18,6 +18,11 @@ REGIME_ORDER = ["none", "hmm_A", "hmm_B", "bocpd"]
 OPT_ORDER = ["min_variance", "erc", "hrp", "mv_turnover"]
 
 
+def _public(frame: pl.DataFrame) -> pl.DataFrame:
+    """Published tables carry no run ids: they change on every rerun (see results/grids/)."""
+    return frame.drop([c for c in ("run_id", "base_run_id") if c in frame.columns])
+
+
 def _fmt_p(p: float | None) -> str:
     return "-" if p is None else f"{p:.3f}"
 
@@ -106,9 +111,24 @@ def write_evaluation(
     tables = reports_dir / "tables"
     figs = reports_dir / "figures"
     out = {
-        "oos_csv": write_csv(table, tables / "oos_vs_1n.csv"),
-        "ablation_csv": write_csv(ablation, tables / "ablation.csv"),
-        "audit_csv": write_csv(audit, tables / "constraint_audit.csv"),
+        "oos_csv": write_csv(_public(table), tables / "oos_vs_1n.csv"),
+        "ablation_csv": write_csv(_public(ablation), tables / "ablation.csv"),
+        "audit_csv": write_csv(_public(audit), tables / "constraint_audit.csv"),
+        "trials_csv": write_csv(
+            pl.DataFrame(
+                {
+                    "trial_log_rows": [trials.rows],
+                    "failed_rows": [trials.failed],
+                    "distinct_configurations": [trials.distinct_configs],
+                    "selected": [trials.selected],
+                    "selected_sharpe": [trials.selected_sharpe],
+                    "var_trial_sharpe_annual": [trials.var_trials_annual],
+                    "expected_max_sharpe_annual": [trials.sr0_annual],
+                    "dsr": [trials.dsr],
+                }
+            ),
+            tables / "trials.csv",
+        ),
         "cumulative": cumulative_figure(
             runs, [headline, "1/N", headline.split("+")[0]], figs / "cumulative_vs_1n.png"
         ),

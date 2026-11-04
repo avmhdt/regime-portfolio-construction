@@ -130,7 +130,11 @@ def utc_timestamp(now: datetime | None = None) -> str:
 
 
 def git_sha(log_path: Path = DEFAULT_LOG_PATH) -> str:
-    """HEAD commit, with ``-dirty`` if tracked files other than the log itself changed.
+    """HEAD commit, with ``-dirty`` if tracked files other than generated outputs changed.
+
+    Generated outputs are the log itself and everything under ``reports/`` and ``results/``:
+    ``regport reproduce`` rewrites committed tables before its later backtests run, and those
+    runs still execute the committed code.
 
     Outside a git checkout the all-zero hash with ``-dirty`` is returned, so a run is still logged.
     """
@@ -141,11 +145,12 @@ def git_sha(log_path: Path = DEFAULT_LOG_PATH) -> str:
     try:
         sha = git("rev-parse", "HEAD").strip()
         root = Path(git("rev-parse", "--show-toplevel").strip())
+        pathspec = [".", ":(exclude)reports", ":(exclude)results"]
         try:
             log_rel = log_path.resolve().relative_to(root.resolve()).as_posix()
-            pathspec = [".", f":(exclude){log_rel}"]
+            pathspec.append(f":(exclude){log_rel}")
         except ValueError:
-            pathspec = ["."]
+            pass
         status = git("status", "--porcelain", "--untracked-files=no", "--", *pathspec)
     except (OSError, subprocess.CalledProcessError):
         return "0" * 40 + "-dirty"

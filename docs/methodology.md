@@ -33,7 +33,7 @@ The selection rule was fixed in `docs/decisions.md` before the first evaluation.
 
 ## Minimum variance (FR-17)
 
-`min w'Σw` subject to `1'w = 1` and `0 ≤ w ≤ c`, where `c = max(0.40, 1/N)`. The problem is solved as `||L'w||²` with `Σ = LL'`, first with CLARABEL and then with OSQP if CLARABEL fails. Weights within `1e-9` of the bounds are clipped and renormalized; anything larger raises `ConstraintViolation`. Validation: when no bound binds, the solution equals the closed form `Σ⁻¹1 / (1'Σ⁻¹1)` within 1e-6.
+`min w'Σw` subject to `1'w = 1` and `0 ≤ w ≤ c`, where `c = max(0.40, 1/N)`. The problem is solved as `||L'w||²` with `Σ = LL'`, first with CLARABEL and then with OSQP if CLARABEL fails. Weights within `1e-9` of the bounds are clipped and renormalized; anything larger raises `ConstraintViolation`. The solver's answer is then polished: on its active set (weights at 0 and at `c`) the KKT system `Σ_FF w_F + Σ_FC w_C = (ν/2) 1`, `1'w = 1` is solved exactly, and the result replaces the solver's only if it passes every KKT check (free weights within bounds, gradients at the bounds on the right side of `ν/2`). For a positive definite Σ this is the unique optimum; CLARABEL alone can sit up to about 1e-5 from it along flat directions. Every cvxpy solve (min-variance and mean-variance) starts a fresh solver instance, so results don't depend on what the process solved before. Validation: when no bound binds, the solution equals the closed form `Σ⁻¹1 / (1'Σ⁻¹1)` within 1e-6.
 
 ## Equal risk contribution (FR-18)
 

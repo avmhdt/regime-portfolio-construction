@@ -26,6 +26,7 @@ from regport.logs import get_logger
 from regport.regime.filter import forward_filter
 from regport.regime.hmm import HMMParams, fit_hmm
 from regport.regime.labels import relabel
+from regport.resources import wait_for_memory
 
 log = get_logger(__name__)
 F64 = npt.NDArray[np.float64]
@@ -93,6 +94,7 @@ class WalkForwardHMM:
             for k, f in enumerate(points)
         ]
         if self.n_jobs > 1:
+            wait_for_memory("walk-forward HMM")
             with ProcessPoolExecutor(max_workers=self.n_jobs) as pool:
                 raw = list(pool.map(_fit_job, jobs))
         else:

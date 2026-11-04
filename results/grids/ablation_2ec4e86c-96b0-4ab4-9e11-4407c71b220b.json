@@ -1,0 +1,115 @@
+{
+ "grid_id": "2ec4e86c-96b0-4ab4-9e11-4407c71b220b",
+ "kind": "ablation",
+ "finished": "2026-11-03T23:03:40Z",
+ "tag": "grid",
+ "runs": [
+  {
+   "optimizer": "min_variance",
+   "regime": "none",
+   "run_id": "a1ee1180-73b8-49ea-bcc5-ad167814db3a",
+   "config_hash": "afe3ff81a1921ae5"
+  },
+  {
+   "optimizer": "min_variance",
+   "regime": "hmm_A",
+   "run_id": "d9c0566d-9628-4c45-8435-0cdc6df00019",
+   "config_hash": "e1a0da0854a5eb44"
+  },
+  {
+   "optimizer": "min_variance",
+   "regime": "hmm_B",
+   "run_id": "8ce5fb53-56ab-466a-b86d-23fa72dd2bbd",
+   "config_hash": "787d5c6cf0ad8821"
+  },
+  {
+   "optimizer": "min_variance",
+   "regime": "bocpd",
+   "run_id": "5a630b61-fd60-4149-b921-227c305bbbf0",
+   "config_hash": "caa29f59340e998a"
+  },
+  {
+   "optimizer": "erc",
+   "regime": "none",
+   "run_id": "03b538d7-f5de-46bc-91d6-4f4aa4634642",
+   "config_hash": "7b602ba04d614143"
+  },
+  {
+   "optimizer": "erc",
+   "regime": "hmm_A",
+   "run_id": "59f9b620-6fd9-465d-a536-a11392f154b3",
+   "config_hash": "2a536cbaa4a56e3f"
+  },
+  {
+   "optimizer": "erc",
+   "regime": "hmm_B",
+   "run_id": "2d4f2ee3-0922-41d5-b26a-5279b8c558f2",
+   "config_hash": "774134f27aadef3b"
+  },
+  {
+   "optimizer": "erc",
+   "regime": "bocpd",
+   "run_id": "38af155e-7da8-4146-8e31-f3b540c195c9",
+   "config_hash": "4105dd1ffcd6e243"
+  },
+  {
+   "optimizer": "hrp",
+   "regime": "none",
+   "run_id": "a2cca8d3-6a0f-462d-8f06-d722f505d1fc",
+   "config_hash": "f37c914d76b95177"
+  },
+  {
+   "optimizer": "hrp",
+   "regime": "hmm_A",
+   "run_id": "50cd17f9-5f8f-4185-8d3f-8440f29832ee",
+   "config_hash": "a3f9b22157d9749c"
+  },
+  {
+   "optimizer": "hrp",
+   "regime": "hmm_B",
+   "run_id": "ead7aa54-c66f-434d-9101-fa7d1879f1b2",
+   "config_hash": "4dbc37febd4460ae"
+  },
+  {
+   "optimizer": "hrp",
+   "regime": "bocpd",
+   "run_id": "23fc82aa-d93e-4737-bf80-4f12c6b5901e",
+   "config_hash": "830644d7db4ac204"
+  },
+  {
+   "optimizer": "mv_turnover",
+   "regime": "none",
+   "run_id": "13e15d53-f59d-446c-8cc8-4e0f0beefde1",
+   "config_hash": "b4a4effbc480eb4c"
+  },
+  {
+   "optimizer": "mv_turnover",
+   "regime": "hmm_A",
+   "run_id": "d5e92131-23cd-43a0-96ad-eb58c1616fa2",
+   "config_hash": "acc77a49d111566b"
+  },
+  {
+   "optimizer": "mv_turnover",
+   "regime": "hmm_B",
+   "run_id": "cf920fc4-2fd8-4269-b81e-e40ff9929def",
+   "config_hash": "2f2802012500b7f1"
+  },
+  {
+   "optimizer": "mv_turnover",
+   "regime": "bocpd",
+   "run_id": "e20c0c8d-9fab-4649-9ac7-ae366d6b8634",
+   "config_hash": "572c10763003d64b"
+  },
+  {
+   "optimizer": "equal_weight",
+   "regime": "none",
+   "run_id": "3126ebe2-d1aa-49fc-916d-026e138c276f",
+   "config_hash": "e3a93e86e7760222"
+  }
+ ],
+ "config": "configs\\ablation.yaml",
+ "headline": {
+  "optimizer": "erc",
+  "regime": "hmm_A"
+ }
+}

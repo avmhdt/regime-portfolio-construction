@@ -46,6 +46,7 @@ def write_robustness(
         "alfred": "ALFRED vintage vs revised",
     }
     for suite, table in tables.items():
+        table = table.drop([c for c in ("run_id",) if c in table.columns])
         out[suite] = write_csv(table, reports_dir / "tables" / f"robustness_{suite}.csv")
         lines += [f"## {titles.get(suite, suite)}", ""]
         if suite in notes:

@@ -3,6 +3,15 @@
 ``min w' Σ w  s.t.  1'w = 1, 0 <= w <= cap``, solved with CLARABEL and, if that fails, OSQP.
 The problem is a cached cvxpy ``Parameter`` problem per asset count, written as
 ``||L' w||^2`` with ``Σ = L L'`` so it stays DPP and re-solves cheaply.
+
+Every solve starts a fresh solver (``warm_start=False``): cvxpy otherwise reuses the previous
+CLARABEL instance with its data updated in place, and the answer then depends on what the
+process solved before, by up to 1e-6 (NFR-02).
+
+The interior-point answer can still sit up to about 1e-5 from the optimum along flat
+directions, so min-variance weights are polished: on the solver's active set (weights at 0 and
+at the cap) the KKT system is solved exactly, and the result is kept only if it satisfies every
+KKT condition. For a positive definite Σ that point is the unique optimum.
 """
 
 from __future__ import annotations
@@ -37,7 +46,7 @@ def solve_weights(
     errors = []
     for solver in solvers:
         try:
-            problem.solve(solver=solver, **SOLVER_OPTIONS.get(solver, {}))
+            problem.solve(solver=solver, warm_start=False, **SOLVER_OPTIONS.get(solver, {}))
         except cp.error.SolverError as exc:
             errors.append(f"{solver}: {exc}")
             continue
@@ -68,6 +77,44 @@ def _factor(cov: F64) -> F64:
     return out
 
 
+def _kkt_point(sigma: F64, w: F64, cap: float, tol: float) -> F64 | None:
+    """The exact optimum on ``w``'s active set at ``tol``, or None if it fails a KKT check."""
+    at_cap = w >= cap - tol
+    free = (w > tol) & ~at_cap
+    n_cap = int(at_cap.sum())
+    if not free.any():
+        return np.where(at_cap, cap, 0.0) if abs(cap * n_cap - 1.0) < 1e-12 else None
+    capped = np.full(n_cap, cap)
+    rhs = np.column_stack([np.ones(int(free.sum())), sigma[np.ix_(free, at_cap)] @ capped])
+    try:
+        x, y = np.linalg.solve(sigma[np.ix_(free, free)], rhs).T
+    except np.linalg.LinAlgError:
+        return None
+    half_nu = (1.0 - cap * n_cap + y.sum()) / x.sum()  # Σ_FF w_F + Σ_FC w_C = (ν/2) 1
+    out = np.where(at_cap, cap, 0.0)
+    out[free] = half_nu * x - y
+    grad = sigma @ out
+    slack = 1e-6 * abs(half_nu)
+    ok = (
+        bool(np.all(np.isfinite(out)))
+        and out[free].min() >= -1e-12
+        and out[free].max() <= cap + 1e-12
+        and bool(np.all(grad[~free & ~at_cap] >= half_nu - slack))
+        and bool(np.all(grad[at_cap] <= half_nu + slack))
+    )
+    return out if ok else None
+
+
+def polish(cov: F64, w: F64, cap: float) -> F64:
+    """Replace solver weights by the exact KKT point on their active set, when one checks out."""
+    sigma = 0.5 * (cov + cov.T) / float(np.mean(np.diag(cov)))
+    for tol in (1e-7, 1e-6, 1e-5, 1e-4):
+        out = _kkt_point(sigma, w, cap, tol)
+        if out is not None:
+            return clean_weights(out, cap)
+    return w
+
+
 def min_variance(
     cov: F64, max_weight: float = 1.0, solvers: tuple[str, ...] = ("CLARABEL", "OSQP")
 ) -> F64:
@@ -80,4 +127,5 @@ def min_variance(
     scale = float(np.mean(np.diag(cov)))
     factor.value = _factor(cov / scale)
     cap.value = effective_cap(max_weight, n)
-    return solve_weights(problem, w, float(cap.value), solvers, "min_variance")
+    weights = solve_weights(problem, w, float(cap.value), solvers, "min_variance")
+    return polish(cov, weights, float(cap.value))

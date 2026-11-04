@@ -17,6 +17,7 @@ import numpy.typing as npt
 
 from regport.regime.bocpd import NormalGammaPrior, bocpd
 from regport.regime.hmm import bic, fit_hmm
+from regport.resources import wait_for_memory
 
 F64 = npt.NDArray[np.float64]
 HAZARD_GRID = (100.0, 250.0, 500.0, 1000.0)
@@ -55,6 +56,7 @@ def choose_k(
     """Lowest BIC among ``candidates`` on the standardized pre-OOS features ``x``."""
     jobs = [(x, k, n_init, seed + k, end, max_iter, tol) for k in candidates]
     if n_jobs > 1:
+        wait_for_memory("regime selection")
         with ProcessPoolExecutor(max_workers=min(n_jobs, len(jobs))) as pool:
             results = list(pool.map(_fit_k, jobs))
     else:
@@ -161,6 +163,7 @@ def choose_bocpd_constrained(
         for a0 in ALPHA_GRID
     ]
     if n_jobs > 1:
+        wait_for_memory("regime selection")
         with ProcessPoolExecutor(max_workers=n_jobs) as pool:
             checks = list(pool.map(validate_setting, jobs))
     else:
